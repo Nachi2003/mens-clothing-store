@@ -30,7 +30,8 @@ public class SecurityConfig {
                                 "/api/stock-movements/**",
                                 "/api/users/register",
                                 "/api/users/login",
-                                "/api/customers/**"
+                                "/api/customers/**",
+                                "/api/admin/**"
                         )
                         .permitAll()
                         .anyRequest()
