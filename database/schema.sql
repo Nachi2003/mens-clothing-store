@@ -224,3 +224,11 @@ CREATE TABLE shop_settings (
     closing_time TIME,
     low_stock_threshold INT NOT NULL DEFAULT 10
 );
+
+CREATE TABLE invoice_sequence (
+    sequence_id BIGINT PRIMARY KEY,
+    next_number BIGINT NOT NULL
+);
+
+INSERT INTO invoice_sequence (sequence_id, next_number)
+VALUES (1, 1);
