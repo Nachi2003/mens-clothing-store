@@ -2,6 +2,7 @@ package com.mensclothingstore.backend.controller;
 
 import java.util.List;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +20,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/product-variants")
+@CrossOrigin(origins = "http://localhost:5173")
 public class ProductVariantController {
 
     private final ProductVariantService productVariantService;
@@ -59,7 +61,6 @@ public class ProductVariantController {
 
     @DeleteMapping("/{variantId}")
     public void deleteVariant(@PathVariable Long variantId) {
-
         productVariantService.deleteVariant(variantId);
     }
 }
