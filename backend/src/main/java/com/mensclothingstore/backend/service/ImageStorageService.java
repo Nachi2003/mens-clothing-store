@@ -61,4 +61,28 @@ public class ImageStorageService {
 
         return "/uploads/" + filename;
     }
+    public void deleteImage(String imageUrl) throws IOException {
+
+    if (imageUrl == null || imageUrl.isBlank()) {
+        return;
+    }
+
+    String filename = imageUrl.substring(
+            imageUrl.lastIndexOf("/") + 1
+    );
+
+    Path uploadPath = Paths.get(uploadDir)
+            .toAbsolutePath()
+            .normalize();
+
+    Path imagePath = uploadPath
+            .resolve(filename)
+            .normalize();
+
+    if (!imagePath.startsWith(uploadPath)) {
+        throw new IOException("Invalid file path.");
+    }
+
+    Files.deleteIfExists(imagePath);
+}
 }

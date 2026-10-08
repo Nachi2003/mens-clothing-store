@@ -101,11 +101,20 @@ public class CartService {
     }
 
     // Get complete cart with total amount
+    
+    // Get complete cart with total amount
     public CartDetailsResponse getCartItems(Long userId) {
 
-        Cart cart = cartRepository.findByCustomer_UserId(userId)
+        User customer = userRepository.findById(userId)
                 .orElseThrow(() ->
-                        new RuntimeException("Cart not found"));
+                        new RuntimeException("Customer not found"));
+
+        Cart cart = cartRepository.findByCustomer_UserId(userId)
+                .orElseGet(() -> {
+                    Cart newCart = new Cart();
+                    newCart.setCustomer(customer);
+                    return cartRepository.save(newCart);
+                });
 
         List<CartItem> cartItems =
                 cartItemRepository.findByCart_CartId(
@@ -117,15 +126,10 @@ public class CartService {
                     ProductVariant variant =
                             cartItem.getVariant();
 
-                    BigDecimal unitPrice =
-                            variant.getPrice();
+                    BigDecimal unitPrice = variant.getPrice();
 
-                    BigDecimal subtotal =
-                            unitPrice.multiply(
-                                    BigDecimal.valueOf(
-                                            cartItem.getQuantity()
-                                    )
-                            );
+                    BigDecimal subtotal = unitPrice.multiply(
+                            BigDecimal.valueOf(cartItem.getQuantity()));
 
                     return new CartItemResponse(
                             cartItem.getCartItemId(),
@@ -142,10 +146,7 @@ public class CartService {
 
         BigDecimal totalAmount = items.stream()
                 .map(CartItemResponse::getSubtotal)
-                .reduce(
-                        BigDecimal.ZERO,
-                        BigDecimal::add
-                );
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new CartDetailsResponse(
                 cart.getCartId(),

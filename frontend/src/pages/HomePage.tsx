@@ -4,18 +4,38 @@ interface Product {
   productId: number;
   productName: string;
   categoryName: string;
+  description?: string;
 }
 
 interface ProductImage {
+  imageId?: number;
   imageUrl?: string;
   image_url?: string;
+  primary?: boolean;
   isPrimary?: boolean;
   is_primary?: boolean;
+}
+
+interface ProductVariant {
+  variantId: number;
+  productId: number;
+  productName: string;
+  size: string;
+  color: string;
+  price: number;
+  active: boolean;
 }
 
 interface Category {
   name: string;
   slug: string;
+}
+
+interface TrendingProduct {
+  product: Product;
+  imageUrl: string;
+  color: string;
+  price: number;
 }
 
 const categories: Category[] = [
@@ -25,23 +45,44 @@ const categories: Category[] = [
   { name: "Jeans", slug: "jeans" },
 ];
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+function normalizeImageUrl(imageUrl: string): string {
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+
+  return `${API_BASE_URL}${imageUrl}`;
+}
+
 function HomePage() {
   const [categoryImages, setCategoryImages] = useState<
     Record<string, string>
   >({});
 
+  const [trendingProducts, setTrendingProducts] = useState<
+    TrendingProduct[]
+  >([]);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadCategoryImages() {
+    async function loadHomeData() {
       try {
-        const response = await fetch("/api/products");
+        const response = await fetch(`${API_BASE_URL}/api/products`);
 
         if (!response.ok) {
           throw new Error("Failed to fetch products");
         }
 
         const products: Product[] = await response.json();
+
+        /*
+         * ==========================================
+         * CATEGORY IMAGES
+         * ==========================================
+         */
 
         const imageMap: Record<string, string> = {};
 
@@ -60,7 +101,7 @@ function HomePage() {
 
             if (matchingProducts.length === 0) return;
 
-            // Randomly select a product from this category.
+            // Random product from this category
             const randomIndex = Math.floor(
               Math.random() * matchingProducts.length
             );
@@ -69,7 +110,7 @@ function HomePage() {
 
             try {
               const imageResponse = await fetch(
-                `/api/products/${selectedProduct.productId}/images`
+                `${API_BASE_URL}/api/products/${selectedProduct.productId}/images`
               );
 
               if (!imageResponse.ok) return;
@@ -80,17 +121,22 @@ function HomePage() {
               if (!Array.isArray(images) || images.length === 0) return;
 
               const primaryImage = images.find(
-                (image) => image.isPrimary || image.is_primary
+                (image) =>
+                  image.primary ||
+                  image.isPrimary ||
+                  image.is_primary
               );
 
               const selectedImage =
                 primaryImage || images[0];
 
               const imageUrl =
-                selectedImage.imageUrl || selectedImage.image_url;
+                selectedImage.imageUrl ||
+                selectedImage.image_url;
 
               if (imageUrl) {
-                imageMap[category.slug] = imageUrl;
+                imageMap[category.slug] =
+                  normalizeImageUrl(imageUrl);
               }
             } catch (error) {
               console.error(
@@ -101,15 +147,111 @@ function HomePage() {
           })
         );
 
+        /*
+         * ==========================================
+         * TRENDING PRODUCTS
+         * ==========================================
+         */
+
+        const productsToShow = products.slice(0, 4);
+
+        const trendingResults = await Promise.all(
+          productsToShow.map(async (product) => {
+            try {
+              const [imageResponse, variantResponse] =
+                await Promise.all([
+                  fetch(
+                    `${API_BASE_URL}/api/products/${product.productId}/images`
+                  ),
+                  fetch(
+                    `${API_BASE_URL}/api/product-variants`
+                  ),
+                ]);
+
+              let imageUrl = "";
+
+              if (imageResponse.ok) {
+                const images: ProductImage[] =
+                  await imageResponse.json();
+
+                if (Array.isArray(images) && images.length > 0) {
+                  const primaryImage = images.find(
+                    (image) =>
+                      image.primary ||
+                      image.isPrimary ||
+                      image.is_primary
+                  );
+
+                  const selectedImage =
+                    primaryImage || images[0];
+
+                  const rawImageUrl =
+                    selectedImage.imageUrl ||
+                    selectedImage.image_url;
+
+                  if (rawImageUrl) {
+                    imageUrl = normalizeImageUrl(rawImageUrl);
+                  }
+                }
+              }
+
+              let variants: ProductVariant[] = [];
+
+              if (variantResponse.ok) {
+                variants = await variantResponse.json();
+              }
+
+              const productVariants = variants.filter(
+                (variant) =>
+                  variant.productId === product.productId &&
+                  variant.active
+              );
+
+              if (productVariants.length === 0) {
+                return null;
+              }
+
+              // Display the lowest active variant price
+              const lowestPrice = Math.min(
+                ...productVariants.map(
+                  (variant) => Number(variant.price)
+                )
+              );
+
+              const firstVariant = productVariants[0];
+
+              return {
+                product,
+                imageUrl,
+                color: firstVariant.color,
+                price: lowestPrice,
+              };
+            } catch (error) {
+              console.error(
+                `Failed to load product ${product.productId}:`,
+                error
+              );
+
+              return null;
+            }
+          })
+        );
+
         if (!cancelled) {
           setCategoryImages(imageMap);
+
+          setTrendingProducts(
+            trendingResults.filter(
+              (item): item is TrendingProduct => item !== null
+            )
+          );
         }
       } catch (error) {
-        console.error("Failed to load category images:", error);
+        console.error("Failed to load homepage data:", error);
       }
     }
 
-    loadCategoryImages();
+    loadHomeData();
 
     return () => {
       cancelled = true;
@@ -118,10 +260,15 @@ function HomePage() {
 
   return (
     <main className="home-page">
-      {/* Hero Section */}
+      {/* ==========================================
+          HERO SECTION
+          ========================================== */}
+
       <section className="hero">
         <div className="hero-content">
-          <p className="hero-label">MEN'S COLLECTION</p>
+          <p className="hero-label">
+            UNIQUE ZONE · THE FASHION GARAGE
+          </p>
 
           <h1>
             Style that
@@ -130,8 +277,8 @@ function HomePage() {
           </h1>
 
           <p className="hero-description">
-            Discover timeless menswear designed for everyday confidence,
-            comfort, and style.
+            Discover men's fashion designed for everyday
+            confidence, comfort, and style.
           </p>
 
           <a href="/shop" className="hero-button">
@@ -142,20 +289,24 @@ function HomePage() {
         <div className="hero-image">
           <img
             src="/images/hero-men.jpg"
-            alt="L'ATELIER premium men's fashion collection"
+            alt="Unique Zone men's fashion collection"
           />
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* ==========================================
+          CATEGORIES SECTION
+          ========================================== */}
+
       <section className="categories-section">
         <div className="section-heading">
-          <p className="section-label">EXPLORE</p>
+          <p className="section-label">EXPLORE UNIQUE ZONE</p>
 
           <h2>Shop by Category</h2>
 
           <p>
-            Find your everyday essentials and timeless styles.
+            Discover everyday essentials and styles from
+            Unique Zone.
           </p>
         </div>
 
@@ -174,7 +325,9 @@ function HomePage() {
                     loading="lazy"
                   />
                 ) : (
-                  <span>{category.name.toUpperCase()}</span>
+                  <span>
+                    {category.name.toUpperCase()}
+                  </span>
                 )}
               </div>
 
@@ -187,11 +340,14 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Trending Products Section */}
+      {/* ==========================================
+          TRENDING PRODUCTS
+          ========================================== */}
+
       <section className="products-section">
         <div className="section-heading products-heading">
           <div>
-            <p className="section-label">THIS WEEK</p>
+            <p className="section-label">UNIQUE ZONE</p>
             <h2>Trending Products</h2>
           </div>
 
@@ -201,74 +357,79 @@ function HomePage() {
         </div>
 
         <div className="product-grid">
-          <a href="/product/1" className="product-card">
-            <div className="product-image">
-              <span>NEW</span>
-              SHIRT
-            </div>
+          {trendingProducts.map((item) => (
+            <a
+              key={item.product.productId}
+              href={`/product/${item.product.productId}`}
+              className="product-card"
+            >
+              <div className="product-image">
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt={item.product.productName}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span>
+                    {item.product.categoryName?.toUpperCase()}
+                  </span>
+                )}
 
-            <div className="product-details">
-              <h3>Classic Casual Shirt</h3>
-              <p>Black</p>
-              <strong>₹799</strong>
-            </div>
-          </a>
+                <span className="product-new-label">
+                  NEW
+                </span>
+              </div>
 
-          <a href="/product/2" className="product-card">
-            <div className="product-image">T-SHIRT</div>
+              <div className="product-details">
+                <h3>{item.product.productName}</h3>
 
-            <div className="product-details">
-              <h3>Premium Cotton T-Shirt</h3>
-              <p>White</p>
-              <strong>₹599</strong>
-            </div>
-          </a>
+                <p>{item.color}</p>
 
-          <a href="/product/3" className="product-card">
-            <div className="product-image">JEANS</div>
-
-            <div className="product-details">
-              <h3>Slim Fit Jeans</h3>
-              <p>Dark Blue</p>
-              <strong>₹1,299</strong>
-            </div>
-          </a>
-
-          <a href="/product/4" className="product-card">
-            <div className="product-image">TROUSERS</div>
-
-            <div className="product-details">
-              <h3>Regular Fit Trousers</h3>
-              <p>Beige</p>
-              <strong>₹999</strong>
-            </div>
-          </a>
+                <strong>
+                  ₹{item.price.toLocaleString("en-IN")}
+                </strong>
+              </div>
+            </a>
+          ))}
         </div>
+
+        {trendingProducts.length === 0 && (
+          <p className="home-empty-message">
+            New styles are arriving soon.
+          </p>
+        )}
       </section>
 
-      {/* Brand Story Section */}
+      {/* ==========================================
+          BRAND STORY
+          ========================================== */}
+
       <section className="story-section">
         <div className="story-image">
           <div className="story-image-placeholder">
-            OUR
+            UNIQUE
             <br />
-            STORY
+            ZONE
           </div>
         </div>
 
         <div className="story-content">
-          <p className="section-label">OUR PHILOSOPHY</p>
+          <p className="section-label">
+            THE FASHION GARAGE
+          </p>
 
           <h2>
-            Simple style.
+            Style made
             <br />
-            Made for every day.
+            for every day.
           </h2>
 
           <p>
-            We believe great menswear does not need to be complicated.
-            Our collection focuses on clean designs, comfortable fabrics,
-            and timeless styles that fit naturally into everyday life.
+            At Unique Zone, we bring together everyday
+            fashion, comfort, and contemporary style.
+            Discover pieces made to fit your lifestyle
+            and express your individuality.
           </p>
 
           <a href="/shop" className="story-button">

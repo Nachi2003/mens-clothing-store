@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+
 import { addToCart } from "../services/cartService";
+import { addToBackendCart } from "../services/backendCartService";
+
 import type { Product } from "../types/Product";
 import type { ProductVariant } from "../types/ProductVariant";
 
@@ -9,6 +12,16 @@ interface ProductImage {
   imageId: number;
   imageUrl: string;
   primary: boolean;
+}
+
+interface InventoryResponse {
+  inventoryId: number;
+  variantId: number;
+  productName: string;
+  size: string;
+  color: string;
+  quantity: number;
+  updatedAt: string;
 }
 
 // Convert relative image paths to complete backend URLs
@@ -35,9 +48,34 @@ function ProductDetailsPage() {
     useState<ProductVariant | null>(null);
 
   const [quantity, setQuantity] = useState(1);
+  const [stockQuantity, setStockQuantity] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const loadVariantStock = async (variantId: number) => {
+    try {
+      const response = await axios.get<InventoryResponse>(
+        `http://localhost:8080/api/inventory/variant/${variantId}`
+      );
+
+      const availableStock = response.data.quantity ?? 0;
+
+      setStockQuantity(availableStock);
+
+      setQuantity((currentQuantity) => {
+        if (availableStock <= 0) {
+          return 1;
+        }
+
+        return Math.min(currentQuantity, availableStock);
+      });
+    } catch (inventoryError) {
+      console.error("Failed to load inventory:", inventoryError);
+      setStockQuantity(0);
+      setQuantity(1);
+    }
+  };
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -79,9 +117,23 @@ function ProductDetailsPage() {
         setSelectedImage(primaryImage);
 
         if (productVariants.length > 0) {
-          setSelectedVariant(productVariants[0]);
+          const firstVariant = productVariants[0];
+
+          setSelectedVariant(firstVariant);
+
+          try {
+            const inventoryResponse = await axios.get<InventoryResponse>(
+              `http://localhost:8080/api/inventory/variant/${firstVariant.variantId}`
+            );
+
+            setStockQuantity(inventoryResponse.data.quantity ?? 0);
+          } catch (inventoryError) {
+            console.error("Failed to load inventory:", inventoryError);
+            setStockQuantity(0);
+          }
         } else {
           setSelectedVariant(null);
+          setStockQuantity(0);
         }
       } catch (err) {
         console.error("Failed to load product:", err);
@@ -97,40 +149,73 @@ function ProductDetailsPage() {
   }, [productId]);
 
   const decreaseQuantity = () => {
-    setQuantity((current) => Math.max(1, current - 1));
+    setQuantity((currentQuantity) => Math.max(1, currentQuantity - 1));
   };
-const handleAddToCart = () => {
-  if (!selectedVariant || !product) {
-    alert("Please select a size and color.");
-    return;
-  }
-
-  addToCart({
-    productId: product.productId,
-    variantId: selectedVariant.variantId,
-    productName: product.productName,
-    size: selectedVariant.size,
-    color: selectedVariant.color,
-    price: selectedVariant.price,
-    quantity: quantity,
-    imageUrl: selectedImage
-      ? getFullImageUrl(selectedImage.imageUrl)
-      : "",
-  });
-
-  alert("Product added to cart successfully!");
-};
 
   const increaseQuantity = () => {
-    setQuantity((current) => current + 1);
+    setQuantity((currentQuantity) => {
+      if (stockQuantity <= 0) {
+        return 1;
+      }
+
+      return Math.min(currentQuantity + 1, stockQuantity);
+    });
+  };
+
+  const handleAddToCart = async () => {
+    if (!selectedVariant || !product) {
+      alert("Please select a size and color.");
+      return;
+    }
+
+    if (stockQuantity <= 0) {
+      alert("This variant is currently out of stock.");
+      return;
+    }
+
+    if (quantity > stockQuantity) {
+      alert(
+        `Only ${stockQuantity} item${
+          stockQuantity === 1 ? "" : "s"
+        } available.`
+      );
+      setQuantity(stockQuantity);
+      return;
+    }
+
+    try {
+      // First, save the item to the backend
+      await addToBackendCart(selectedVariant.variantId, quantity);
+
+      // Then update the local cart for the UI
+      addToCart({
+        productId: product.productId,
+        variantId: selectedVariant.variantId,
+        productName: product.productName,
+        size: selectedVariant.size,
+        color: selectedVariant.color,
+        price: selectedVariant.price,
+        quantity: quantity,
+        imageUrl: selectedImage
+          ? getFullImageUrl(selectedImage.imageUrl)
+          : "",
+      });
+
+      alert("Product added to cart successfully!");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to add product to cart.";
+
+      alert(message);
+    }
   };
 
   if (loading) {
     return (
       <main className="product-page">
-        <div className="product-page-message">
-          Loading product...
-        </div>
+        <div className="product-page-message">Loading product...</div>
       </main>
     );
   }
@@ -165,7 +250,6 @@ const handleAddToCart = () => {
     <main className="product-page">
       <section className="product-main">
         {/* Image Gallery */}
-
         <div className="product-gallery">
           {images.length > 1 && (
             <div className="product-thumbnails">
@@ -203,7 +287,6 @@ const handleAddToCart = () => {
         </div>
 
         {/* Product Information */}
-
         <div className="product-info">
           <p className="product-category">
             {product.categoryName}
@@ -223,13 +306,11 @@ const handleAddToCart = () => {
           <div className="product-divider" />
 
           {/* Description */}
-
           <p className="product-description">
             {product.description}
           </p>
 
           {/* Color */}
-
           <div className="product-option">
             <div className="option-header">
               <span>COLOR</span>
@@ -257,6 +338,8 @@ const handleAddToCart = () => {
                     onClick={() => {
                       if (colorVariant) {
                         setSelectedVariant(colorVariant);
+                        setQuantity(1);
+                        loadVariantStock(colorVariant.variantId);
                       }
                     }}
                     aria-label={color}
@@ -274,12 +357,14 @@ const handleAddToCart = () => {
           </div>
 
           {/* Size */}
-
           <div className="product-option">
             <div className="option-header">
               <span>SELECT SIZE</span>
 
-              <button type="button" className="size-guide">
+              <button
+                type="button"
+                className="size-guide"
+              >
                 Size Guide
               </button>
             </div>
@@ -305,6 +390,8 @@ const handleAddToCart = () => {
                     onClick={() => {
                       if (sizeVariant) {
                         setSelectedVariant(sizeVariant);
+                        setQuantity(1);
+                        loadVariantStock(sizeVariant.variantId);
                       }
                     }}
                   >
@@ -315,13 +402,26 @@ const handleAddToCart = () => {
             </div>
           </div>
 
-          {/* Quantity + Cart */}
+          {/* Stock Status */}
+          <div className="product-stock-status">
+            {stockQuantity <= 0 ? (
+              <span className="out-of-stock">Out of Stock</span>
+            ) : stockQuantity < 10 ? (
+              <span className="low-stock">
+                Only {stockQuantity} left in stock
+              </span>
+            ) : (
+              <span className="in-stock">In Stock</span>
+            )}
+          </div>
 
+          {/* Quantity + Cart */}
           <div className="purchase-row">
             <div className="quantity-selector">
               <button
                 type="button"
                 onClick={decreaseQuantity}
+                disabled={stockQuantity <= 0}
               >
                 −
               </button>
@@ -331,26 +431,29 @@ const handleAddToCart = () => {
               <button
                 type="button"
                 onClick={increaseQuantity}
+                disabled={
+                  stockQuantity <= 0 ||
+                  quantity >= stockQuantity
+                }
               >
                 +
               </button>
             </div>
 
             <button
-  type="button"
-  className="add-to-cart-button"
-  onClick={handleAddToCart}
->
-  ADD TO CART
-</button>
+              type="button"
+              className="add-to-cart-button"
+              onClick={handleAddToCart}
+              disabled={stockQuantity <= 0}
+            >
+              {stockQuantity <= 0 ? "OUT OF STOCK" : "ADD TO CART"}
+            </button>
           </div>
 
           {/* Information Accordions */}
-
           <div className="product-accordions">
             <details>
               <summary>Fabric & Care Instructions</summary>
-
               <p>
                 Dry clean recommended or machine wash with cold water.
                 Follow the care label provided with the product.
@@ -359,7 +462,6 @@ const handleAddToCart = () => {
 
             <details>
               <summary>Complementary Tailoring</summary>
-
               <p>
                 Tailoring and alteration services can be added later.
               </p>
@@ -367,7 +469,6 @@ const handleAddToCart = () => {
 
             <details>
               <summary>Complimentary Shipping & Returns</summary>
-
               <p>
                 Shipping and return information will be available here.
               </p>

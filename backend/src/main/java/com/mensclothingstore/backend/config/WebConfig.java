@@ -1,6 +1,7 @@
 package com.mensclothingstore.backend.config;
-import jakarta.annotation.PostConstruct;
+
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -8,15 +9,27 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOrigins(
+                        "http://localhost:5173",
+                        "http://localhost:5174"
+                )
+                .allowedMethods(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "OPTIONS"
+                )
+                .allowedHeaders("*");
+    }
 
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(
-                    "file:///C:/Users/nachi/OneDrive/Desktop/mens-clothing-store/backend/uploads/"
+                        "file:///C:/Users/nachi/OneDrive/Desktop/mens-clothing-store/backend/uploads/"
                 );
     }
-    @PostConstruct
-public void checkConfig() {
-    System.out.println("WebConfig is loaded!");
-}
 }

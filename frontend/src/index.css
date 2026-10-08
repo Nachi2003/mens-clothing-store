@@ -1,13 +1,773 @@
-html {
-  margin: 0;
-  padding: 0;
+/* =========================================================
+   UNIQUE ZONE — index.css
+   Header, account menu, mobile drawer and logo.
+   Uses the design tokens defined in App.css (:root), so
+   both files must be loaded. All .lat-* class names kept.
+
+   01 Announcement bar   02 Header        03 Navigation
+   04 Actions & bag      05 Account menu  06 Mobile drawer
+   07 Logo               08 Responsive
+   ========================================================= */
+
+
+/* =========================================================
+   01 ANNOUNCEMENT BAR
+   ========================================================= */
+
+.lat-announcement {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
 }
 
-body {
-  margin: 0;
-  padding: 0;
+.lat-announcement-mobile {
+  display: none;
 }
 
-#root {
-  min-height: 100vh;
+
+/* =========================================================
+   02 HEADER
+   ========================================================= */
+
+.lat-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  background: rgba(245, 245, 242, 0.9);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+
+.lat-header-inner {
+  width: 100%;
+  max-width: var(--max);
+  min-height: 80px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+
+/* =========================================================
+   03 NAVIGATION
+   ========================================================= */
+
+.lat-desktop-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: clamp(18px, 2.6vw, 38px);
+}
+
+.lat-desktop-nav a {
+  position: relative;
+  padding: 8px 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.lat-desktop-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s var(--ease);
+}
+
+.lat-desktop-nav a:hover,
+.lat-desktop-nav a.active,
+.lat-desktop-nav a[aria-current="page"] {
+  color: var(--ink);
+}
+
+.lat-desktop-nav a:hover::after,
+.lat-desktop-nav a.active::after,
+.lat-desktop-nav a[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+
+/* =========================================================
+   04 ACTIONS & BAG
+   ========================================================= */
+
+.lat-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lat-icon-button,
+.lat-bag-button {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  transition: background 0.2s ease;
+}
+
+.lat-icon-button:hover,
+.lat-bag-button:hover {
+  background: var(--stone);
+}
+
+.lat-icon-button svg,
+.lat-bag-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lat-bag-count {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+
+/* =========================================================
+   05 ACCOUNT MENU
+   ========================================================= */
+
+.lat-account-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lat-account-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 1100;
+  width: 290px;
+  max-width: calc(100vw - 32px);
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: latDropdownIn 0.2s var(--ease);
+}
+
+@keyframes latDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lat-account-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lat-account-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lat-account-heading p {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lat-account-heading span:not(.lat-account-avatar) {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lat-account-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lat-account-dropdown > a,
+.lat-account-logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 13px 8px;
+  margin: 0 -8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-align: left;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.lat-account-dropdown > a:hover,
+.lat-account-logout:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.lat-account-logout {
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  color: var(--danger);
+}
+
+.lat-account-logout:hover {
+  color: var(--danger);
+}
+
+
+/* =========================================================
+   06 MOBILE DRAWER
+   ========================================================= */
+
+.lat-menu-trigger {
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lat-menu-trigger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.lat-menu-trigger span:nth-child(2) {
+  width: 15px;
+  align-self: flex-start;
+  margin-left: 11px;
+}
+
+.lat-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(11, 11, 11, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.lat-drawer-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.lat-mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2100;
+  width: min(380px, 88vw);
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--paper);
+  transform: translateX(-100%);
+  transition: transform 0.35s var(--ease);
+}
+
+.lat-mobile-drawer.is-open {
+  transform: translateX(0);
+  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.18);
+}
+
+.lat-drawer-header {
+  min-height: 76px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lat-drawer-close {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+  transition: background 0.2s ease;
+}
+
+.lat-drawer-close:hover {
+  background: var(--stone);
+}
+
+/* Account block */
+
+.lat-drawer-account {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 20px;
+  background: var(--ink);
+  color: #fff;
+}
+
+.lat-drawer-avatar {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.lat-drawer-user-info {
+  min-width: 0;
+}
+
+.lat-drawer-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lat-drawer-user-info h3 {
+  margin: 0 0 2px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lat-drawer-user-info p {
+  margin: 0;
+  overflow: hidden;
+  color: #b4b3ad;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lat-drawer-auth {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lat-drawer-auth a {
+  padding: 9px 16px;
+  border: 1px solid #fff;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.lat-drawer-auth a:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
+/* Categories */
+
+.lat-drawer-section {
+  padding: 26px 20px 10px;
+}
+
+.lat-drawer-section-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lat-drawer-nav {
+  border-top: 1px solid var(--line);
+}
+
+.lat-drawer-nav a {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 32px 1fr 26px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: padding-left 0.25s var(--ease);
+}
+
+.lat-drawer-nav a:hover {
+  padding-left: 6px;
+}
+
+.lat-category-number {
+  color: var(--faint);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+
+.lat-category-arrow {
+  display: inline-block;
+  justify-self: end;
+  color: var(--muted);
+  font-size: 16px;
+  transition: transform 0.25s var(--ease), color 0.2s ease;
+}
+
+.lat-drawer-nav a:hover .lat-category-arrow {
+  color: var(--ink);
+  transform: translate(2px, -2px);
+}
+
+/* Account links */
+
+.lat-drawer-account-links {
+  margin: 12px 20px 0;
+  border-top: 1px solid var(--line);
+}
+
+.lat-drawer-account-links a {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 28px 1fr 20px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 15px;
+  transition: color 0.2s ease;
+}
+
+.lat-drawer-account-links a:hover {
+  color: var(--ink);
+}
+
+.lat-drawer-account-links a > span:first-child {
+  color: var(--muted);
+}
+
+.lat-link-arrow {
+  justify-self: end;
+  color: var(--muted);
+}
+
+/* Bag + logout + footer */
+
+.lat-drawer-bag {
+  min-height: 54px;
+  margin: 24px 20px 0;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+.lat-drawer-bag:hover {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.lat-drawer-bag-count {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.lat-drawer-logout {
+  margin: 14px 20px 0;
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.lat-drawer-logout:hover {
+  color: var(--danger);
+}
+
+.lat-drawer-footer {
+  margin-top: auto;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   07 LOGO
+   ========================================================= */
+
+.lat-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lat-logo-image {
+  display: block;
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  transition: transform 0.35s var(--ease);
+}
+
+.lat-logo:hover .lat-logo-image {
+  transform: scale(1.05);
+}
+
+
+/* =========================================================
+   08 RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1024px) {
+  .lat-header-inner {
+    padding: 0 24px;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .lat-announcement {
+    padding: 8px 12px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .lat-announcement-desktop {
+    display: none;
+  }
+
+  .lat-announcement-mobile {
+    display: inline;
+  }
+
+  .lat-header-inner {
+    min-height: 68px;
+    padding: 0 12px;
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 8px;
+  }
+
+  .lat-menu-trigger {
+    display: flex;
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .lat-logo {
+    grid-column: 2;
+    justify-self: center;
+    width: 58px;
+    height: 58px;
+    font-size: 18px;
+  }
+
+  .lat-logo-image {
+    width: 58px;
+    height: 58px;
+  }
+
+  .lat-desktop-nav {
+    display: none;
+  }
+
+  .lat-header-actions {
+    grid-column: 3;
+    gap: 0;
+  }
+
+  .lat-icon-button,
+  .lat-bag-button {
+    width: 40px;
+    height: 44px;
+  }
+
+  .lat-icon-button svg,
+  .lat-bag-button svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .lat-bag-count {
+    top: 3px;
+    right: 0;
+  }
+
+  .lat-account-dropdown {
+    top: calc(100% + 10px);
+    right: -40px;
+    width: 270px;
+  }
+
+  .lat-drawer-header .lat-logo {
+    grid-column: auto;
+    width: auto;
+    height: auto;
+  }
+
+  .lat-drawer-header .lat-logo-image {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (max-width: 380px) {
+  .lat-header-inner {
+    padding: 0 8px;
+    grid-template-columns: 38px 1fr auto;
+    gap: 4px;
+  }
+
+  .lat-menu-trigger {
+    width: 38px;
+  }
+
+  .lat-logo,
+  .lat-logo-image {
+    width: 52px;
+    height: 52px;
+  }
+
+  .lat-icon-button,
+  .lat-bag-button {
+    width: 36px;
+  }
+
+  .lat-account-dropdown {
+    right: -34px;
+    width: 250px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lat-mobile-drawer,
+  .lat-drawer-overlay {
+    transition-duration: 0.01ms;
+  }
 }
