@@ -6,6 +6,7 @@ export interface User {
   email: string;
   phone: string;
   role: string;
+  token?: string;
 }
 
 export interface RegisterData {
@@ -18,6 +19,12 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
+}
+
+export interface StaffAdminLoginData {
+  userId: string;
+  password: string;
+  role: "ADMIN" | "STAFF";
 }
 
 // Register a new customer
@@ -59,7 +66,6 @@ export const loginUser = async (
     throw new Error(result.message || "Login failed");
   }
 
-  // Save logged-in user details
   localStorage.setItem("latelier_user", JSON.stringify(result));
 
   return result;
@@ -72,7 +78,44 @@ export const getLoggedInUser = (): User | null => {
   return user ? JSON.parse(user) : null;
 };
 
+// Get saved authentication token
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem("latelier_token");
+};
+
 // Logout
 export const logoutUser = (): void => {
   localStorage.removeItem("latelier_user");
+  localStorage.removeItem("latelier_token");
+};
+
+// Login Staff or Admin
+export const loginStaffAdmin = async (
+  data: StaffAdminLoginData
+): Promise<User> => {
+  const response = await fetch(`${API_URL}/staff-admin/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result: User = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      (result as User & { message?: string }).message ||
+        "Staff/Admin login failed"
+    );
+  }
+
+  if (!result.token) {
+    throw new Error("Login succeeded but no authentication token was returned");
+  }
+
+  localStorage.setItem("latelier_user", JSON.stringify(result));
+  localStorage.setItem("latelier_token", result.token);
+
+  return result;
 };

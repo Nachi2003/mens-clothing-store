@@ -7,6 +7,7 @@ public class LoginResponse {
     private String email;
     private String phone;
     private String role;
+    private String token;
 
     public LoginResponse(
             Long userId,
@@ -15,11 +16,23 @@ public class LoginResponse {
             String phone,
             String role) {
 
+        this(userId, name, email, phone, role, null);
+    }
+
+    public LoginResponse(
+            Long userId,
+            String name,
+            String email,
+            String phone,
+            String role,
+            String token) {
+
         this.userId = userId;
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.role = role;
+        this.token = token;
     }
 
     public Long getUserId() {
@@ -40,5 +53,9 @@ public class LoginResponse {
 
     public String getRole() {
         return role;
+    }
+
+    public String getToken() {
+        return token;
     }
 }

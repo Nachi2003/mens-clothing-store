@@ -3500,3 +3500,360 @@ button {
     padding-right: 14px;
   }
 }
+/* Staff and Admin Login */
+
+.staff-admin-login-page {
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #f5f3ef;
+}
+
+.staff-admin-login-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 40px;
+  background: #fff;
+  border: 1px solid #e5e0d8;
+  border-radius: 8px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.07);
+}
+
+.staff-admin-login-brand {
+  display: block;
+  color: #1b1b1b;
+  text-align: center;
+  text-decoration: none;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.staff-admin-login-tagline {
+  margin: 8px 0 30px;
+  color: #777;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 3px;
+}
+
+.staff-admin-login-title {
+  margin-bottom: 8px;
+  color: #222;
+  text-align: center;
+  font-size: 25px;
+}
+
+.staff-admin-login-subtitle {
+  margin-bottom: 28px;
+  color: #777;
+  text-align: center;
+  font-size: 14px;
+}
+
+.staff-admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.staff-admin-login-form label {
+  margin-top: 8px;
+  color: #333;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.staff-admin-login-form input,
+.staff-admin-login-form select {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px;
+  border: 1px solid #d8d3cb;
+  border-radius: 4px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.staff-admin-login-form input:focus,
+.staff-admin-login-form select:focus {
+  outline: 2px solid #b49a67;
+  border-color: #b49a67;
+}
+
+.staff-admin-login-form button {
+  min-height: 48px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 4px;
+  background: #202020;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.staff-admin-login-form button:hover {
+  background: #444;
+}
+
+.staff-admin-login-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.staff-admin-login-error {
+  margin: 8px 0 0;
+  color: #c62828;
+  font-size: 13px;
+}
+
+.staff-admin-login-back {
+  display: block;
+  margin-top: 24px;
+  color: #555;
+  text-align: center;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.staff-admin-login-back:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .staff-admin-login-card {
+    padding: 28px 22px;
+  }
+
+  .staff-admin-login-brand {
+    font-size: 25px;
+  }
+}
+
+/* Staff and Admin Portal Layout */
+
+.staff-admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f5f3;
+  color: #222;
+}
+
+.staff-admin-sidebar {
+  width: 255px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px;
+  background: #202020;
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.staff-admin-sidebar-brand {
+  padding: 4px 8px 28px;
+  border-bottom: 1px solid #414141;
+}
+
+.staff-admin-sidebar-brand h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 2px;
+}
+
+.staff-admin-sidebar-brand p {
+  margin: 8px 0 0;
+  color: #c5b18a;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.staff-admin-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 6px;
+  border-bottom: 1px solid #414141;
+}
+
+.staff-admin-avatar {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: #c5b18a;
+  color: #202020;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.staff-admin-user strong,
+.staff-admin-user span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.staff-admin-user strong {
+  font-size: 14px;
+}
+
+.staff-admin-user span {
+  margin-top: 5px;
+  color: #c5b18a;
+  font-size: 12px;
+}
+
+.staff-admin-navigation {
+  flex: 1;
+  padding-top: 16px;
+}
+
+.staff-admin-nav-heading {
+  margin: 22px 8px 10px;
+  color: #aaa;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.staff-admin-nav-link {
+  display: block;
+  margin: 4px 0;
+  padding: 12px;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.staff-admin-nav-link:hover,
+.staff-admin-nav-link.active {
+  background: #3b3b3b;
+  color: #fff;
+}
+
+.staff-admin-nav-link.active {
+  border-left: 3px solid #c5b18a;
+}
+
+.staff-admin-sidebar-bottom {
+  padding-top: 18px;
+  border-top: 1px solid #414141;
+}
+
+.staff-admin-logout {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.staff-admin-logout:hover {
+  background: #414141;
+}
+
+.staff-admin-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.staff-admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 32px;
+  border-bottom: 1px solid #e4e2dd;
+  background: #fff;
+}
+
+.staff-admin-topbar-label {
+  color: #888;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.staff-admin-topbar h1 {
+  margin: 8px 0 0;
+  font-size: 25px;
+}
+
+.staff-admin-role-badge {
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: #eee8dc;
+  color: #54452c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.staff-admin-content {
+  padding: 30px 32px;
+}
+
+@media (max-width: 760px) {
+  .staff-admin-sidebar {
+    width: 190px;
+    padding: 20px 10px;
+  }
+
+  .staff-admin-sidebar-brand h2 {
+    font-size: 17px;
+  }
+
+  .staff-admin-topbar {
+    padding: 22px 18px;
+  }
+
+  .staff-admin-content {
+    padding: 22px 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .staff-admin-layout {
+    flex-direction: column;
+  }
+
+  .staff-admin-sidebar {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .staff-admin-sidebar-brand {
+    padding-bottom: 16px;
+  }
+
+  .staff-admin-user {
+    padding: 14px 4px;
+  }
+
+  .staff-admin-navigation {
+    padding-top: 4px;
+  }
+
+  .staff-admin-nav-heading {
+    margin-top: 14px;
+  }
+
+  .staff-admin-sidebar-bottom {
+    margin-top: 12px;
+  }
+
+  .staff-admin-topbar h1 {
+    font-size: 21px;
+  }
+}
