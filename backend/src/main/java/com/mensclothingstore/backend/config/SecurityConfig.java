@@ -1,4 +1,3 @@
-
 package com.mensclothingstore.backend.config;
 
 import java.util.List;
@@ -96,13 +95,13 @@ public class SecurityConfig {
                 ).hasAnyRole("ADMIN", "STAFF")
 
                 // Public stock checks for customer cart
-                // Keep this rule BEFORE broader inventory rules
+                // Keep this before broader inventory rules
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/inventory/variant/**"
                 ).permitAll()
 
-                // Other inventory reads: Admin and Staff only
+                // Other inventory reads: Admin and Staff
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/inventory",
@@ -156,6 +155,36 @@ public class SecurityConfig {
                     "/api/admin/reports",
                     "/api/admin/reports/**"
                 ).hasRole("ADMIN")
+
+                // Customer order creation: Customer only
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/customers/*/orders"
+                ).hasRole("CUSTOMER")
+
+                // Customer order list: Customer only
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/customers/*/orders"
+                ).hasRole("CUSTOMER")
+
+                // Order items: authenticated customer or staff
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/customers/orders/*/items"
+                ).hasAnyRole("CUSTOMER", "ADMIN", "STAFF")
+
+                // Customer order details
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/customers/*/orders/*"
+                ).hasAnyRole("CUSTOMER", "ADMIN", "STAFF")
+
+                // Customer order cancellation
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/customers/*/orders/*"
+                ).hasRole("CUSTOMER")
 
                 // Admin/Staff order management
                 .requestMatchers(

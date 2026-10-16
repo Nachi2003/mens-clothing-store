@@ -22,8 +22,13 @@ export async function placeOrder(
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-      },
+  "Content-Type": "application/json",
+  ...(localStorage.getItem("latelier_token")
+    ? {
+        Authorization: `Bearer ${localStorage.getItem("latelier_token")}`,
+      }
+    : {}),
+},
       body: JSON.stringify(request),
     }
   );

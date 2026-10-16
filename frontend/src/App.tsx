@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
+import CategoryManagementPage from "./pages/CategoryManagementPage";
 import HomePage from "./pages/HomePage";
 import ShopPage from "./pages/ShopPage";
 import ProductDetailsPage from "./pages/ProductDetailsPage";
@@ -11,7 +11,7 @@ import RegisterPage from "./pages/RegisterPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ProfilePage from "./pages/ProfilePage";
-
+import ProductManagementPage from "./pages/ProductManagementPage";
 import StaffAdminLoginPage from "./pages/StaffAdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import StaffDashboardPage from "./pages/StaffDashboardPage";
@@ -127,9 +127,9 @@ function App() {
 
           {/* Temporary routes to prevent unmatched-route warnings */}
           <Route
-            path="/staff-admin/products"
-            element={<ComingSoonPage title="Products & Inventory" />}
-          />
+  path="/staff-admin/products"
+  element={<ProductManagementPage />}
+/>
           <Route
             path="/staff-admin/sales"
             element={<ComingSoonPage title="Sales & Billing" />}
@@ -137,6 +137,10 @@ function App() {
           <Route
             path="/staff-admin/reports"
             element={<ComingSoonPage title="Reports" />}
+          />
+          <Route
+            path="/staff-admin/categories"
+            element={<CategoryManagementPage />}
           />
         </Route>
 

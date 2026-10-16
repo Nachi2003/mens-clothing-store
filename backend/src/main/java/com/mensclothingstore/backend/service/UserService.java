@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.service;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -54,6 +55,7 @@ public class UserService {
         );
     }
 
+    // Customer login with JWT
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
@@ -66,15 +68,23 @@ public class UserService {
             throw new RuntimeException("Invalid email or password");
         }
 
+        String token = jwtService.generateToken(
+                user.getUserId(),
+                user.getEmail(),
+                user.getRole()
+        );
+
         return new LoginResponse(
                 user.getUserId(),
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
-                user.getRole()
+                user.getRole(),
+                token
         );
     }
 
+    // Staff/Admin login with JWT
     public LoginResponse loginStaffAdmin(
             StaffAdminLoginRequest request) {
 
@@ -128,6 +138,7 @@ public class UserService {
         );
     }
 
+    // Admin-created staff account
     public RegisterResponse createStaff(
             CreateStaffRequest request) {
 

@@ -14,7 +14,7 @@ import jakarta.persistence.LockModeType;
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     Optional<Inventory> findByVariant_VariantId(Long variantId);
-
+void deleteByVariant_VariantId(Long variantId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT i

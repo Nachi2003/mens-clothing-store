@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.entity;
 
 import jakarta.persistence.Column;
@@ -27,6 +28,9 @@ public class ProductImage {
 
     @Column(name = "is_primary", nullable = false)
     private boolean primary;
+
+    @Column(name = "color", length = 80)
+    private String color;
 
     public Long getImageId() {
         return imageId;
@@ -58,5 +62,13 @@ public class ProductImage {
 
     public void setPrimary(boolean primary) {
         this.primary = primary;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
     }
 }

@@ -49,6 +49,7 @@ export const registerUser = async (
 };
 
 // Login an existing customer
+
 export const loginUser = async (
   data: LoginData
 ): Promise<User> => {
@@ -60,23 +61,40 @@ export const loginUser = async (
     body: JSON.stringify(data),
   });
 
-  const result = await response.json();
+  const result: User & { message?: string } = await response.json();
 
   if (!response.ok) {
     throw new Error(result.message || "Login failed");
   }
 
+  if (!result.token) {
+    throw new Error("Login succeeded but no authentication token was returned");
+  }
+
   localStorage.setItem("latelier_user", JSON.stringify(result));
+  localStorage.setItem("latelier_token", result.token);
 
   return result;
 };
 
 // Get logged-in user
+
 export const getLoggedInUser = (): User | null => {
   const user = localStorage.getItem("latelier_user");
 
-  return user ? JSON.parse(user) : null;
+  if (!user) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(user) as User;
+  } catch {
+    localStorage.removeItem("latelier_user");
+    localStorage.removeItem("latelier_token");
+    return null;
+  }
 };
+
 
 // Get saved authentication token
 export const getAuthToken = (): string | null => {

@@ -4,25 +4,30 @@ import axios from "axios";
 
 import { Link, useSearchParams } from "react-router-dom";
 
-
-
 import { getProducts } from "../services/productService";
 
 import { getProductVariants } from "../services/productVariantService";
-
-
 
 import type { Product } from "../types/Product";
 
 import type { ProductVariant } from "../types/ProductVariant";
 
-
-
 const API_BASE_URL =
-
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
+/** Normalize category names and URL slugs to the same comparable value. */
+function normalizeCategory(category?: string | null): string {
+  const normalized = (category ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 
+  if (["tshirt", "tshirts", "tee", "tees"].includes(normalized)) return "tshirts";
+  if (["shirt", "shirts"].includes(normalized)) return "shirts";
+  if (["trouser", "trousers"].includes(normalized)) return "trousers";
+  if (["jean", "jeans"].includes(normalized)) return "jeans";
+  return normalized;
+}
 
 interface ProductImage {
 
@@ -33,8 +38,6 @@ interface ProductImage {
   primary: boolean;
 
 }
-
-
 
 type SortOption =
 
@@ -48,23 +51,15 @@ type SortOption =
 
   | "name";
 
-
-
 function ShopPage() {
 
   const [searchParams] = useSearchParams();
 
-
-
   const urlCategory = searchParams.get("category") || "";
-
-
 
   const [products, setProducts] = useState<Product[]>([]);
 
   const [variants, setVariants] = useState<ProductVariant[]>([]);
-
-
 
   const [productImages, setProductImages] = useState<
 
@@ -72,19 +67,13 @@ function ShopPage() {
 
   >({});
 
-
-
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
 
-
-
   // Search
 
   const [searchTerm, setSearchTerm] = useState("");
-
-
 
   // Filters
 
@@ -94,19 +83,13 @@ function ShopPage() {
 
   );
 
-
-
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
 
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
-
-
   const [minPrice, setMinPrice] = useState("");
 
   const [maxPrice, setMaxPrice] = useState("");
-
-
 
   // Sorting
 
@@ -114,13 +97,9 @@ function ShopPage() {
 
     useState<SortOption>("recommended");
 
-
-
   // Mobile filter drawer
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-
-
 
   /*
 
@@ -138,8 +117,6 @@ function ShopPage() {
 
         setError("");
 
-
-
         const [productData, variantData] = await Promise.all([
 
           getProducts(),
@@ -148,13 +125,9 @@ function ShopPage() {
 
         ]);
 
-
-
         setProducts(productData);
 
         setVariants(variantData);
-
-
 
         /*
 
@@ -174,17 +147,11 @@ function ShopPage() {
 
               );
 
-
-
               const images = response.data;
-
-
 
               const primaryImage =
 
                 images.find((image) => image.primary) ?? images[0];
-
-
 
               return {
 
@@ -204,8 +171,6 @@ function ShopPage() {
 
               );
 
-
-
               return {
 
                 productId: product.productId,
@@ -220,19 +185,13 @@ function ShopPage() {
 
         );
 
-
-
         const imageMap: Record<number, string> = {};
-
-
 
         imageResults.forEach((result) => {
 
           imageMap[result.productId] = result.imageUrl;
 
         });
-
-
 
         setProductImages(imageMap);
 
@@ -250,13 +209,9 @@ function ShopPage() {
 
     };
 
-
-
     loadShopData();
 
   }, []);
-
-
 
   /*
 
@@ -284,8 +239,6 @@ function ShopPage() {
 
   }, [urlCategory]);
 
-
-
   /*
 
    * Get unique categories
@@ -295,8 +248,6 @@ function ShopPage() {
   const categories = useMemo(() => {
 
     const categorySet = new Set<string>();
-
-
 
     products.forEach((product) => {
 
@@ -308,13 +259,9 @@ function ShopPage() {
 
     });
 
-
-
     return Array.from(categorySet).sort();
 
   }, [products]);
-
-
 
   /*
 
@@ -326,8 +273,6 @@ function ShopPage() {
 
     const sizeSet = new Set<string>();
 
-
-
     variants.forEach((variant) => {
 
       if (variant.active && variant.size) {
@@ -338,13 +283,9 @@ function ShopPage() {
 
     });
 
-
-
     return Array.from(sizeSet).sort();
 
   }, [variants]);
-
-
 
   /*
 
@@ -356,8 +297,6 @@ function ShopPage() {
 
     const colorSet = new Set<string>();
 
-
-
     variants.forEach((variant) => {
 
       if (variant.active && variant.color) {
@@ -368,13 +307,9 @@ function ShopPage() {
 
     });
 
-
-
     return Array.from(colorSet).sort();
 
   }, [variants]);
-
-
 
   /*
 
@@ -398,8 +333,6 @@ function ShopPage() {
 
   };
 
-
-
   /*
 
    * Get lowest active variant price
@@ -414,15 +347,11 @@ function ShopPage() {
 
     const productVariants = getProductVariantList(productId);
 
-
-
     const prices = productVariants
 
       .map((variant) => Number(variant.price))
 
       .filter((price) => !Number.isNaN(price));
-
-
 
     if (prices.length === 0) {
 
@@ -430,13 +359,9 @@ function ShopPage() {
 
     }
 
-
-
     return Math.min(...prices);
 
   };
-
-
 
   /*
 
@@ -448,8 +373,6 @@ function ShopPage() {
 
     let result = [...products];
 
-
-
     /*
 
      * SEARCH
@@ -457,8 +380,6 @@ function ShopPage() {
      */
 
     const search = searchTerm.trim().toLowerCase();
-
-
 
     if (search) {
 
@@ -468,19 +389,13 @@ function ShopPage() {
 
           product.productName?.toLowerCase() || "";
 
-
-
         const category =
 
           product.categoryName?.toLowerCase() || "";
 
-
-
         const description =
 
           product.description?.toLowerCase() || "";
-
-
 
         return (
 
@@ -496,8 +411,6 @@ function ShopPage() {
 
     }
 
-
-
     /*
 
      * CATEGORY FILTER
@@ -508,25 +421,16 @@ function ShopPage() {
 
       result = result.filter((product) => {
 
-        const category =
-
-          product.categoryName?.toLowerCase() || "";
-
-
+        const productCategory = normalizeCategory(product.categoryName);
 
         return selectedCategories.some(
-
           (selectedCategory) =>
-
-            selectedCategory.toLowerCase() === category
-
+            normalizeCategory(selectedCategory) === productCategory
         );
 
       });
 
     }
-
-
 
     /*
 
@@ -543,8 +447,6 @@ function ShopPage() {
           product.productId
 
         );
-
-
 
         return productVariants.some((variant) =>
 
@@ -564,8 +466,6 @@ function ShopPage() {
 
     }
 
-
-
     /*
 
      * COLOR FILTER
@@ -581,8 +481,6 @@ function ShopPage() {
           product.productId
 
         );
-
-
 
         return productVariants.some((variant) =>
 
@@ -602,8 +500,6 @@ function ShopPage() {
 
     }
 
-
-
     /*
 
      * MINIMUM PRICE
@@ -614,15 +510,11 @@ function ShopPage() {
 
       const minimum = Number(minPrice);
 
-
-
       if (!Number.isNaN(minimum)) {
 
         result = result.filter((product) => {
 
           const price = getLowestPrice(product.productId);
-
-
 
           return price !== null && price >= minimum;
 
@@ -631,8 +523,6 @@ function ShopPage() {
       }
 
     }
-
-
 
     /*
 
@@ -644,15 +534,11 @@ function ShopPage() {
 
       const maximum = Number(maxPrice);
 
-
-
       if (!Number.isNaN(maximum)) {
 
         result = result.filter((product) => {
 
           const price = getLowestPrice(product.productId);
-
-
 
           return price !== null && price <= maximum;
 
@@ -661,8 +547,6 @@ function ShopPage() {
       }
 
     }
-
-
 
     /*
 
@@ -680,21 +564,15 @@ function ShopPage() {
 
             getLowestPrice(a.productId) ?? Infinity;
 
-
-
           const priceB =
 
             getLowestPrice(b.productId) ?? Infinity;
-
-
 
           return priceA - priceB;
 
         });
 
         break;
-
-
 
       case "price-high":
 
@@ -704,21 +582,15 @@ function ShopPage() {
 
             getLowestPrice(a.productId) ?? 0;
 
-
-
           const priceB =
 
             getLowestPrice(b.productId) ?? 0;
-
-
 
           return priceB - priceA;
 
         });
 
         break;
-
-
 
       case "name":
 
@@ -729,8 +601,6 @@ function ShopPage() {
         );
 
         break;
-
-
 
       case "newest":
 
@@ -748,8 +618,6 @@ function ShopPage() {
 
         break;
 
-
-
       case "recommended":
 
       default:
@@ -763,8 +631,6 @@ function ShopPage() {
         break;
 
     }
-
-
 
     return result;
 
@@ -790,8 +656,6 @@ function ShopPage() {
 
   ]);
 
-
-
   /*
 
    * Toggle category
@@ -810,8 +674,6 @@ function ShopPage() {
 
       );
 
-
-
       if (exists) {
 
         return current.filter(
@@ -824,15 +686,11 @@ function ShopPage() {
 
       }
 
-
-
       return [...current, category.toLowerCase()];
 
     });
 
   };
-
-
 
   /*
 
@@ -852,8 +710,6 @@ function ShopPage() {
 
       );
 
-
-
       if (exists) {
 
         return current.filter(
@@ -866,15 +722,11 @@ function ShopPage() {
 
       }
 
-
-
       return [...current, size];
 
     });
 
   };
-
-
 
   /*
 
@@ -894,8 +746,6 @@ function ShopPage() {
 
       );
 
-
-
       if (exists) {
 
         return current.filter(
@@ -908,15 +758,11 @@ function ShopPage() {
 
       }
 
-
-
       return [...current, color];
 
     });
 
   };
-
-
 
   /*
 
@@ -927,8 +773,6 @@ function ShopPage() {
   const clearFilters = () => {
 
     setSearchTerm("");
-
-
 
     /*
 
@@ -950,8 +794,6 @@ function ShopPage() {
 
     }
 
-
-
     setSelectedSizes([]);
 
     setSelectedColors([]);
@@ -963,8 +805,6 @@ function ShopPage() {
     setSortOption("recommended");
 
   };
-
-
 
   /*
 
@@ -984,8 +824,6 @@ function ShopPage() {
 
     (maxPrice !== "" ? 1 : 0);
 
-
-
   /*
 
    * Filter panel
@@ -999,8 +837,6 @@ function ShopPage() {
       <div className="filter-header">
 
         <h2>Filters</h2>
-
-
 
         {activeFilterCount > 0 && (
 
@@ -1022,15 +858,11 @@ function ShopPage() {
 
       </div>
 
-
-
       {/* CATEGORY */}
 
       <div className="filter-group">
 
         <h3>Category</h3>
-
-
 
         {categories.length === 0 ? (
 
@@ -1070,8 +902,6 @@ function ShopPage() {
 
               />
 
-
-
               <span>{category}</span>
 
             </label>
@@ -1082,15 +912,11 @@ function ShopPage() {
 
       </div>
 
-
-
       {/* SIZE */}
 
       <div className="filter-group">
 
         <h3>Size</h3>
-
-
 
         {sizes.length === 0 ? (
 
@@ -1126,8 +952,6 @@ function ShopPage() {
 
                 />
 
-
-
                 <span>{size}</span>
 
               </label>
@@ -1140,15 +964,11 @@ function ShopPage() {
 
       </div>
 
-
-
       {/* COLOR */}
 
       <div className="filter-group">
 
         <h3>Color</h3>
-
-
 
         {colors.length === 0 ? (
 
@@ -1184,8 +1004,6 @@ function ShopPage() {
 
               />
 
-
-
               <span>{color}</span>
 
             </label>
@@ -1196,51 +1014,68 @@ function ShopPage() {
 
       </div>
 
-
-
       {/* PRICE */}
 
       <div className="filter-group">
 
         <h3>Price</h3>
 
-
-
         <div className="price-inputs">
 
           <div className="price-input-wrapper">
+
   <span className="price-symbol">₹</span>
+
   <input
+
     type="text"
+
     inputMode="numeric"
+
     placeholder="Min"
+
     value={minPrice}
+
     onChange={(event) => {
+
       const value = event.target.value.replace(/\D/g, "");
+
       setMinPrice(value);
+
     }}
+
   />
+
 </div>
-
-
 
           <span>–</span>
 
-
-
           <div className="price-input-wrapper">
+
   <span className="price-symbol">₹</span>
+
   <input
+
     type="text"
+
     inputMode="numeric"
+
     placeholder="Max"
+
     value={maxPrice}
+
     onChange={(event) => {
+
       const value = event.target.value.replace(/\D/g, "");
+
       setMaxPrice(value);
+
     }}
+
   />
+
 </div>
+
         </div>
 
       </div>
@@ -1248,8 +1083,6 @@ function ShopPage() {
     </aside>
 
   );
-
-
 
   return (
 
@@ -1265,11 +1098,7 @@ function ShopPage() {
 
         </p>
 
-
-
         <h1>Shop Men's Clothing</h1>
-
-
 
         <p>
 
@@ -1280,8 +1109,6 @@ function ShopPage() {
         </p>
 
       </section>
-
-
 
       <section className="shop-content">
 
@@ -1307,8 +1134,6 @@ function ShopPage() {
 
               Filters
 
-
-
               {activeFilterCount > 0 && (
 
                 <span className="filter-count">
@@ -1320,8 +1145,6 @@ function ShopPage() {
               )}
 
             </button>
-
-
 
             <p>
 
@@ -1340,8 +1163,6 @@ function ShopPage() {
             </p>
 
           </div>
-
-
 
           {/* SEARCH */}
 
@@ -1367,8 +1188,6 @@ function ShopPage() {
 
           </div>
 
-
-
           {/* SORT */}
 
           <div className="shop-sort">
@@ -1378,8 +1197,6 @@ function ShopPage() {
               Sort:
 
             </label>
-
-
 
             <select
 
@@ -1405,15 +1222,11 @@ function ShopPage() {
 
               </option>
 
-
-
               <option value="price-low">
 
                 Price: Low to High
 
               </option>
-
-
 
               <option value="price-high">
 
@@ -1421,15 +1234,11 @@ function ShopPage() {
 
               </option>
 
-
-
               <option value="newest">
 
                 Newest
 
               </option>
-
-
 
               <option value="name">
 
@@ -1443,8 +1252,6 @@ function ShopPage() {
 
         </div>
 
-
-
         {/* SHOP CONTENT */}
 
         <div className="shop-layout">
@@ -1456,8 +1263,6 @@ function ShopPage() {
             {renderFilterPanel()}
 
           </div>
-
-
 
           {/* PRODUCTS */}
 
@@ -1473,8 +1278,6 @@ function ShopPage() {
 
             )}
 
-
-
             {!loading && error && (
 
               <div className="empty-products">
@@ -1484,8 +1287,6 @@ function ShopPage() {
               </div>
 
             )}
-
-
 
             {!loading &&
 
@@ -1501,8 +1302,6 @@ function ShopPage() {
 
               )}
 
-
-
             {!loading &&
 
               !error &&
@@ -1515,8 +1314,6 @@ function ShopPage() {
 
                   <h3>No products found</h3>
 
-
-
                   <p>
 
                     Try changing your search or
@@ -1524,8 +1321,6 @@ function ShopPage() {
                     filters.
 
                   </p>
-
-
 
                   <button
 
@@ -1542,8 +1337,6 @@ function ShopPage() {
                 </div>
 
               )}
-
-
 
             {!loading &&
 
@@ -1563,8 +1356,6 @@ function ShopPage() {
 
                       );
 
-
-
                     const lowestPrice =
 
                       getLowestPrice(
@@ -1573,8 +1364,6 @@ function ShopPage() {
 
                       );
 
-
-
                     const imageUrl =
 
                       productImages[
@@ -1582,8 +1371,6 @@ function ShopPage() {
                       product.productId
 
                       ];
-
-
 
                     /*
 
@@ -1602,8 +1389,6 @@ function ShopPage() {
                         : `${API_BASE_URL}${imageUrl}`
 
                       : "";
-
-
 
                     return (
 
@@ -1667,8 +1452,6 @@ function ShopPage() {
 
                         </div>
 
-
-
                         {/* PRODUCT DETAILS */}
 
                         <div className="product-details">
@@ -1679,15 +1462,11 @@ function ShopPage() {
 
                           </h3>
 
-
-
                           <p>
 
                             {product.categoryName}
 
                           </p>
-
-
 
                           {lowestPrice !== null && (
 
@@ -1704,8 +1483,6 @@ function ShopPage() {
                             </strong>
 
                           )}
-
-
 
                           <p>
 
@@ -1739,8 +1516,6 @@ function ShopPage() {
 
       </section>
 
-
-
       {/* MOBILE FILTER DRAWER */}
 
       {showMobileFilters && (
@@ -1773,8 +1548,6 @@ function ShopPage() {
 
               <h2>Filters</h2>
 
-
-
               <button
 
                 type="button"
@@ -1795,11 +1568,7 @@ function ShopPage() {
 
             </div>
 
-
-
             {renderFilterPanel()}
-
-
 
             <div className="mobile-filter-actions">
 
@@ -1814,8 +1583,6 @@ function ShopPage() {
                 Clear All
 
               </button>
-
-
 
               <button
 
@@ -1846,7 +1613,5 @@ function ShopPage() {
   );
 
 }
-
-
 
 export default ShopPage;

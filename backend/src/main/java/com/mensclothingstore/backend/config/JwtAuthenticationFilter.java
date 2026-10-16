@@ -51,7 +51,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (userId != null
                         && ("ADMIN".equals(role)
-                        || "STAFF".equals(role))) {
+                        || "STAFF".equals(role)
+                        || "CUSTOMER".equals(role))) {
 
                     var authentication =
                             new UsernamePasswordAuthenticationToken(

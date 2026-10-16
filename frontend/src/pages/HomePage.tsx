@@ -89,15 +89,25 @@ function HomePage() {
         await Promise.all(
           categories.map(async (category) => {
             const matchingProducts = products.filter((product) => {
-              const productCategory = product.categoryName
-                ?.trim()
-                .toLowerCase();
+  const productCategory = (product.categoryName ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 
-              return (
-                productCategory === category.name.toLowerCase() ||
-                productCategory === category.slug.toLowerCase()
-              );
-            });
+  const targetCategory = category.name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+
+  if (targetCategory === "tshirts") {
+    return ["tshirt", "tshirts", "tee", "tees"].includes(
+      productCategory
+    );
+  }
+
+  return productCategory === targetCategory ||
+    productCategory === category.slug.toLowerCase().replace(/[\s_-]+/g, "");
+});
 
             if (matchingProducts.length === 0) return;
 

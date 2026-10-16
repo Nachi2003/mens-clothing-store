@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.service;
 
 import java.util.List;
@@ -28,7 +29,8 @@ public class InventoryService {
 
     public List<InventoryResponse> getAllInventory() {
 
-        List<Inventory> inventoryList = inventoryRepository.findAll();
+        List<Inventory> inventoryList =
+                inventoryRepository.findAll();
 
         return inventoryList.stream()
                 .map(this::convertToResponse)
@@ -41,26 +43,37 @@ public class InventoryService {
                 inventoryRepository.findByVariant_VariantId(variantId);
 
         if (inventoryOptional.isEmpty()) {
-            throw new RuntimeException("Inventory not found for variant");
+            throw new RuntimeException(
+                    "Inventory not found for variant");
         }
 
         return convertToResponse(inventoryOptional.get());
     }
 
-    public InventoryResponse createInventory(InventoryRequest request) {
+    public InventoryResponse createInventory(
+            InventoryRequest request) {
 
         Optional<ProductVariant> variantOptional =
-                productVariantRepository.findById(request.getVariantId());
+                productVariantRepository.findById(
+                        request.getVariantId());
 
         if (variantOptional.isEmpty()) {
-            throw new RuntimeException("Product variant not found");
+            throw new RuntimeException(
+                    "Product variant not found");
+        }
+
+        if (request.getQuantity() < 0) {
+            throw new RuntimeException(
+                    "Stock quantity cannot be negative");
         }
 
         Optional<Inventory> existingInventory =
-                inventoryRepository.findByVariant_VariantId(request.getVariantId());
+                inventoryRepository.findByVariant_VariantId(
+                        request.getVariantId());
 
         if (existingInventory.isPresent()) {
-            throw new RuntimeException("Inventory already exists for this variant");
+            throw new RuntimeException(
+                    "Inventory already exists for this variant");
         }
 
         Inventory inventory = new Inventory();
@@ -68,12 +81,42 @@ public class InventoryService {
         inventory.setVariant(variantOptional.get());
         inventory.setQuantity(request.getQuantity());
 
-        Inventory savedInventory = inventoryRepository.save(inventory);
+        Inventory savedInventory =
+                inventoryRepository.save(inventory);
 
         return convertToResponse(savedInventory);
     }
 
-    private InventoryResponse convertToResponse(Inventory inventory) {
+    public InventoryResponse updateInventory(
+            Long variantId,
+            InventoryRequest request) {
+
+        if (!variantId.equals(request.getVariantId())) {
+            throw new RuntimeException(
+                    "Variant ID in URL and request must match");
+        }
+
+        if (request.getQuantity() < 0) {
+            throw new RuntimeException(
+                    "Stock quantity cannot be negative");
+        }
+
+        Inventory inventory = inventoryRepository
+                .findByVariant_VariantId(variantId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Inventory not found for variant"));
+
+        inventory.setQuantity(request.getQuantity());
+
+        Inventory updatedInventory =
+                inventoryRepository.save(inventory);
+
+        return convertToResponse(updatedInventory);
+    }
+
+    private InventoryResponse convertToResponse(
+            Inventory inventory) {
 
         ProductVariant variant = inventory.getVariant();
 

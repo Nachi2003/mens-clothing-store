@@ -1,29 +1,55 @@
 package com.mensclothingstore.backend.service;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.mensclothingstore.backend.dto.ProductRequest;
 import com.mensclothingstore.backend.dto.ProductResponse;
 import com.mensclothingstore.backend.entity.Category;
 import com.mensclothingstore.backend.entity.Product;
+import com.mensclothingstore.backend.entity.ProductVariant;
+import com.mensclothingstore.backend.repository.CartItemRepository;
 import com.mensclothingstore.backend.repository.CategoryRepository;
+import com.mensclothingstore.backend.repository.InventoryRepository;
+import com.mensclothingstore.backend.repository.OrderItemRepository;
+import com.mensclothingstore.backend.repository.ProductImageRepository;
 import com.mensclothingstore.backend.repository.ProductRepository;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Optional;
+import com.mensclothingstore.backend.repository.ProductVariantRepository;
+import com.mensclothingstore.backend.repository.StockMovementRepository;
 
 @Service
 public class ProductService {
-
+private final CartItemRepository cartItemRepository;
+private final InventoryRepository inventoryRepository;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductVariantRepository productVariantRepository;
+private final OrderItemRepository orderItemRepository;
+private final StockMovementRepository stockMovementRepository;
+private final ProductImageRepository productImageRepository;
 
-    public ProductService(
-            ProductRepository productRepository,
-            CategoryRepository categoryRepository) {
+    
+public ProductService(
+        ProductRepository productRepository,
+        CategoryRepository categoryRepository,
+        ProductVariantRepository productVariantRepository,
+        OrderItemRepository orderItemRepository,
+        StockMovementRepository stockMovementRepository,
+        ProductImageRepository productImageRepository,
+        CartItemRepository cartItemRepository,
+        InventoryRepository inventoryRepository) {
 
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
-    }
+    this.productRepository = productRepository;
+    this.categoryRepository = categoryRepository;
+    this.productVariantRepository = productVariantRepository;
+    this.orderItemRepository = orderItemRepository;
+    this.stockMovementRepository = stockMovementRepository;
+    this.productImageRepository = productImageRepository;
+    this.cartItemRepository = cartItemRepository;
+    this.inventoryRepository = inventoryRepository;
+}
 
     public List<ProductResponse> getAllProducts() {
 
@@ -95,17 +121,44 @@ public class ProductService {
         return convertToResponse(updatedProduct);
     }
 
-    public void deleteProduct(Long productId) {
+ 
+@Transactional
+public void deleteProduct(Long productId) {
+    Product product = productRepository.findById(productId)
+            .orElseThrow(() ->
+                    new RuntimeException("Product not found"));
 
-        Optional<Product> productOptional =
-                productRepository.findById(productId);
+    List<ProductVariant> variants =
+            productVariantRepository.findByProduct_ProductId(productId);
 
-        if (productOptional.isEmpty()) {
-            throw new RuntimeException("Product not found");
+    // Check every variant before deleting anything.
+    for (ProductVariant variant : variants) {
+        Long variantId = variant.getVariantId();
+
+        if (orderItemRepository.existsByVariant_VariantId(variantId)) {
+            throw new IllegalStateException(
+                    "Cannot delete this product because it has order history.");
         }
 
-        productRepository.delete(productOptional.get());
+        if (stockMovementRepository.existsByVariant_VariantId(variantId)) {
+            throw new IllegalStateException(
+                    "Cannot delete this product because it has stock movement history.");
+        }
     }
+
+    // Delete dependent records in the correct order.
+    productImageRepository.deleteByProduct_ProductId(productId);
+
+    for (ProductVariant variant : variants) {
+        Long variantId = variant.getVariantId();
+
+        cartItemRepository.deleteByVariant_VariantId(variantId);
+        inventoryRepository.deleteByVariant_VariantId(variantId);
+    }
+
+    productVariantRepository.deleteAll(variants);
+    productRepository.delete(product);
+}
 
     private ProductResponse convertToResponse(Product product) {
 

@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.service;
 
 import java.io.IOException;
@@ -43,71 +44,80 @@ public class ProductImageService {
                 .map(image -> new ProductImageResponse(
                         image.getImageId(),
                         image.getImageUrl(),
-                        image.isPrimary()
+                        image.isPrimary(),
+                        image.getColor()
                 ))
                 .toList();
     }
 
-    // Upload an image and associate it with a product
-   public ProductImageResponse uploadImage(
-        Long productId,
-        MultipartFile file,
-        boolean primary) throws IOException {
+    // Upload an image and associate it with a product and color
+    public ProductImageResponse uploadImage(
+            Long productId,
+            MultipartFile file,
+            boolean primary,
+            String color) throws IOException {
 
-    Product product = productRepository
-            .findById(productId)
-            .orElseThrow(() ->
-                    new RuntimeException("Product not found.")
-            );
+        Product product = productRepository
+                .findById(productId)
+                .orElseThrow(() ->
+                        new RuntimeException("Product not found.")
+                );
 
-    // If this image is primary, make the existing
-    // primary image non-primary first.
-    if (primary) {
-        List<ProductImage> existingImages =
-                productImageRepository
-                        .findByProduct_ProductIdOrderByPrimaryDesc(
-                                productId
-                        );
+        // If this image is primary, make the existing
+        // primary image non-primary first.
+        if (primary) {
+            List<ProductImage> existingImages =
+                    productImageRepository
+                            .findByProduct_ProductIdOrderByPrimaryDesc(
+                                    productId
+                            );
 
-        for (ProductImage existingImage : existingImages) {
-            if (existingImage.isPrimary()) {
-                existingImage.setPrimary(false);
+            for (ProductImage existingImage : existingImages) {
+                if (existingImage.isPrimary()) {
+                    existingImage.setPrimary(false);
+                }
             }
+
+            productImageRepository.saveAll(existingImages);
         }
 
-        productImageRepository.saveAll(existingImages);
+        String imageUrl = imageStorageService.storeImage(file);
+
+        ProductImage productImage = new ProductImage();
+        productImage.setProduct(product);
+        productImage.setImageUrl(imageUrl);
+        productImage.setPrimary(primary);
+        productImage.setColor(
+                color == null || color.isBlank()
+                        ? null
+                        : color.trim()
+        );
+
+        ProductImage savedImage =
+                productImageRepository.save(productImage);
+
+        return new ProductImageResponse(
+                savedImage.getImageId(),
+                savedImage.getImageUrl(),
+                savedImage.isPrimary(),
+                savedImage.getColor()
+        );
     }
 
-    String imageUrl = imageStorageService.storeImage(file);
-
-    ProductImage productImage = new ProductImage();
-    productImage.setProduct(product);
-    productImage.setImageUrl(imageUrl);
-    productImage.setPrimary(primary);
-
-    ProductImage savedImage =
-            productImageRepository.save(productImage);
-
-    return new ProductImageResponse(
-            savedImage.getImageId(),
-            savedImage.getImageUrl(),
-            savedImage.isPrimary()
-    );
-}
     public void deleteImage(Long imageId) throws IOException {
 
-    ProductImage productImage =
-            productImageRepository.findById(imageId)
-                    .orElseThrow(() ->
-                            new RuntimeException("Image not found.")
-                    );
+        ProductImage productImage =
+                productImageRepository.findById(imageId)
+                        .orElseThrow(() ->
+                                new RuntimeException("Image not found.")
+                        );
 
-    // Delete physical image file
-    imageStorageService.deleteImage(
-            productImage.getImageUrl()
-    );
+        // Delete physical image file
+        imageStorageService.deleteImage(
+                productImage.getImageUrl()
+        );
 
-    // Delete database record
-    productImageRepository.delete(productImage);
-}
+        // Delete database record
+        productImageRepository.delete(productImage);
+    }
 }

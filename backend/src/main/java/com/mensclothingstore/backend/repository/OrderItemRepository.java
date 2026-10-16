@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.repository;
 
 import java.math.BigDecimal;
@@ -9,9 +10,12 @@ import org.springframework.data.repository.query.Param;
 
 import com.mensclothingstore.backend.entity.OrderItem;
 
-public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
+public interface OrderItemRepository
+        extends JpaRepository<OrderItem, Long> {
 
     List<OrderItem> findByOrder_OrderId(Long orderId);
+
+    boolean existsByVariant_VariantId(Long variantId);
 
     @Query("""
             SELECT COALESCE(SUM(oi.discount * oi.quantity), 0)

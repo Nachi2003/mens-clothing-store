@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { getLoggedInUser } from "../services/authService";
+import {
+  getLoggedInUser,
+  getAuthToken,
+} from "../services/authService";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -46,8 +49,9 @@ function OrderHistoryPage() {
   useEffect(() => {
     const loadOrders = async () => {
       const loggedInUser = getLoggedInUser();
+      const token = getAuthToken();
 
-      if (!loggedInUser) {
+      if (!loggedInUser || !token) {
         navigate("/login");
         return;
       }
@@ -56,49 +60,48 @@ function OrderHistoryPage() {
         setLoading(true);
         setError("");
 
-        /*
-         * 1. Load customer's orders
-         */
+        // 1. Load the customer's orders
         const ordersResponse = await fetch(
-          `${API_BASE_URL}/api/customers/${loggedInUser.userId}/orders`
+          `${API_BASE_URL}/api/customers/${loggedInUser.userId}/orders`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
 
         if (!ordersResponse.ok) {
+          if (ordersResponse.status === 401) {
+            throw new Error("Your session has expired. Please log in again.");
+          }
+
+          if (ordersResponse.status === 403) {
+            throw new Error(
+              "You don't have permission to access these orders."
+            );
+          }
+
           throw new Error("Unable to load your orders.");
         }
 
-        const ordersData: Order[] =
-          await ordersResponse.json();
+        const ordersData: Order[] = await ordersResponse.json();
 
-        /*
-         * 2. Load items for every order
-         */
-        const ordersWithItems: OrderWithItems[] =
-          await Promise.all(
-            ordersData.map(async (order) => {
-              try {
-                const itemsResponse = await fetch(
-                  `${API_BASE_URL}/api/customers/orders/${order.orderId}/items`
-                );
-
-                if (!itemsResponse.ok) {
-                  return {
-                    ...order,
-                    items: [],
-                  };
+        // 2. Load items for every order
+        const ordersWithItems: OrderWithItems[] = await Promise.all(
+          ordersData.map(async (order) => {
+            try {
+              const itemsResponse = await fetch(
+                `${API_BASE_URL}/api/customers/orders/${order.orderId}/items`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
                 }
+              );
 
-                const items: OrderItem[] =
-                  await itemsResponse.json();
-
-                return {
-                  ...order,
-                  items,
-                };
-              } catch (itemError) {
+              if (!itemsResponse.ok) {
                 console.error(
-                  `Failed to load items for ${order.orderNumber}:`,
-                  itemError
+                  `Unable to load items for ${order.orderNumber}. Status: ${itemsResponse.status}`
                 );
 
                 return {
@@ -106,8 +109,26 @@ function OrderHistoryPage() {
                   items: [],
                 };
               }
-            })
-          );
+
+              const items: OrderItem[] = await itemsResponse.json();
+
+              return {
+                ...order,
+                items,
+              };
+            } catch (itemError) {
+              console.error(
+                `Failed to load items for ${order.orderNumber}:`,
+                itemError
+              );
+
+              return {
+                ...order,
+                items: [],
+              };
+            }
+          })
+        );
 
         setOrders(ordersWithItems);
       } catch (err) {
@@ -126,9 +147,7 @@ function OrderHistoryPage() {
     loadOrders();
   }, [navigate]);
 
-  /*
-   * Format order date
-   */
+  // Format order date
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-IN", {
       day: "2-digit",
@@ -137,9 +156,7 @@ function OrderHistoryPage() {
     });
   };
 
-  /*
-   * Order tracking steps
-   */
+  // Order tracking steps
   const trackingSteps = [
     "PLACED",
     "CONFIRMED",
@@ -148,16 +165,11 @@ function OrderHistoryPage() {
   ];
 
   const getStatusIndex = (status: string) => {
-    const index = trackingSteps.indexOf(
-      status.toUpperCase()
-    );
-
+    const index = trackingSteps.indexOf(status.toUpperCase());
     return index >= 0 ? index : 0;
   };
 
-  /*
-   * Loading
-   */
+  // Loading
   if (loading) {
     return (
       <main className="orders-page">
@@ -172,14 +184,11 @@ function OrderHistoryPage() {
     );
   }
 
-  /*
-   * Error
-   */
+  // Error
   if (error) {
     return (
       <main className="orders-page">
         <div className="orders-container">
-
           <div className="orders-header">
             <span>ACCOUNT</span>
             <h1>MY ORDERS</h1>
@@ -187,7 +196,6 @@ function OrderHistoryPage() {
 
           <div className="orders-error">
             <h2>Something went wrong</h2>
-
             <p>{error}</p>
 
             <button
@@ -197,7 +205,6 @@ function OrderHistoryPage() {
               TRY AGAIN
             </button>
           </div>
-
         </div>
       </main>
     );
@@ -206,20 +213,13 @@ function OrderHistoryPage() {
   return (
     <main className="orders-page">
       <div className="orders-container">
-
-        {/* =================================================
-            CUSTOMER HEADER
-            ================================================= */}
-
+        {/* Customer header */}
         <div className="orders-header">
-
           <span>ACCOUNT</span>
-
           <h1>MY ORDERS</h1>
 
           {user && (
             <div className="orders-customer">
-
               <div className="orders-avatar">
                 {user.name
                   ? user.name.charAt(0).toUpperCase()
@@ -227,79 +227,46 @@ function OrderHistoryPage() {
               </div>
 
               <div>
-                <strong>
-                  Welcome back, {user.name}
-                </strong>
-
-                <p>
-                  {user.email}
-                </p>
+                <strong>Welcome back, {user.name}</strong>
+                <p>{user.email}</p>
               </div>
-
             </div>
           )}
 
           <p className="orders-intro">
-            View your L’ATELIER order history and
-            track your purchases.
+            View your L’ATELIER order history and track your purchases.
           </p>
-
         </div>
 
-        {/* =================================================
-            EMPTY ORDERS
-            ================================================= */}
-
+        {/* Empty orders */}
         {orders.length === 0 ? (
           <div className="orders-empty">
-
             <span>YOUR ACCOUNT</span>
-
             <h2>No orders yet</h2>
 
             <p>
-              You haven't placed an order with
-              L’ATELIER yet.
+              You haven't placed an order with L’ATELIER yet.
             </p>
 
-            <Link to="/shop">
-              START SHOPPING
-            </Link>
-
+            <Link to="/shop">START SHOPPING</Link>
           </div>
         ) : (
-
-          /* =================================================
-             ORDERS
-             ================================================= */
-
+          /* Orders */
           <div className="orders-list">
-
             {orders.map((order) => {
-
-              const currentStatusIndex =
-                getStatusIndex(order.status);
+              const currentStatusIndex = getStatusIndex(order.status);
 
               return (
                 <article
                   className="order-card"
                   key={order.orderId}
                 >
-
-                  {/* -----------------------------------------
-                      ORDER HEADER
-                      ----------------------------------------- */}
-
+                  {/* Order header */}
                   <div className="order-card-top">
-
                     <div>
-                      <span className="order-label">
-                        ORDER
-                      </span>
+                      <span className="order-label">ORDER</span>
 
-                      <h2>
-                        {order.orderNumber}
-                      </h2>
+                      <h2>{order.orderNumber}</h2>
 
                       <p className="order-date">
                         Placed on {formatDate(order.createdAt)}
@@ -311,69 +278,44 @@ function OrderHistoryPage() {
                     >
                       {order.status}
                     </span>
-
                   </div>
 
-                  {/* -----------------------------------------
-                      TRACKING
-                      ----------------------------------------- */}
-
+                  {/* Tracking */}
                   <div className="order-tracking">
-
                     <div className="tracking-title">
                       ORDER STATUS
                     </div>
 
                     <div className="tracking-steps">
+                      {trackingSteps.map((step, index) => {
+                        const completed =
+                          index <= currentStatusIndex;
 
-                      {trackingSteps.map(
-                        (step, index) => {
+                        const active =
+                          index === currentStatusIndex;
 
-                          const completed =
-                            index <= currentStatusIndex;
-
-                          const active =
-                            index === currentStatusIndex;
-
-                          return (
-                            <div
-                              className={`tracking-step ${
-                                completed
-                                  ? "is-completed"
-                                  : ""
-                              } ${
-                                active
-                                  ? "is-active"
-                                  : ""
-                              }`}
-                              key={step}
-                            >
-
-                              <div className="tracking-dot">
-                                {completed
-                                  ? "✓"
-                                  : index + 1}
-                              </div>
-
-                              <span>
-                                {step}
-                              </span>
-
+                        return (
+                          <div
+                            className={`tracking-step ${
+                              completed ? "is-completed" : ""
+                            } ${
+                              active ? "is-active" : ""
+                            }`}
+                            key={step}
+                          >
+                            <div className="tracking-dot">
+                              {completed ? "✓" : index + 1}
                             </div>
-                          );
-                        }
-                      )}
 
+                            <span>{step}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-
                   </div>
 
-                  {/* -----------------------------------------
-                      ORDER ITEMS
-                      ----------------------------------------- */}
-
+                  {/* Order items */}
                   <div className="order-items-section">
-
                     <div className="order-section-label">
                       ORDER ITEMS
                     </div>
@@ -384,110 +326,73 @@ function OrderHistoryPage() {
                       </p>
                     ) : (
                       <div className="order-items">
-
                         {order.items.map((item) => (
                           <div
                             className="order-item"
                             key={item.orderItemId}
                           >
-
                             <div className="order-item-image">
                               L’ATELIER
                             </div>
 
                             <div className="order-item-info">
-
-                              <h3>
-                                {item.productName}
-                              </h3>
+                              <h3>{item.productName}</h3>
 
                               <p>
                                 {item.color} / {item.size}
                               </p>
 
-                              <p>
-                                Qty: {item.quantity}
-                              </p>
-
+                              <p>Qty: {item.quantity}</p>
                             </div>
 
                             <div className="order-item-price">
-
                               ₹
-                              {Number(
-                                item.subtotal
-                              ).toLocaleString(
+                              {Number(item.subtotal).toLocaleString(
                                 "en-IN",
                                 {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 }
                               )}
-
                             </div>
-
                           </div>
                         ))}
-
                       </div>
                     )}
-
                   </div>
 
-                  {/* -----------------------------------------
-                      DELIVERY INFORMATION
-                      ----------------------------------------- */}
-
+                  {/* Delivery information */}
                   <div className="order-delivery">
-
                     <div className="order-section-label">
                       DELIVERY DETAILS
                     </div>
 
                     <div className="order-delivery-grid">
-
                       <div>
                         <span>DELIVER TO</span>
-
-                        <strong>
-                          {user?.name || "Customer"}
-                        </strong>
+                        <strong>{user?.name || "Customer"}</strong>
                       </div>
 
                       <div>
                         <span>PHONE</span>
-
-                        <strong>
-                          {order.phone}
-                        </strong>
+                        <strong>{order.phone}</strong>
                       </div>
 
                       <div className="order-address-box">
                         <span>ADDRESS</span>
-
-                        <p>
-                          {order.address}
-                        </p>
+                        <p>{order.address}</p>
                       </div>
-
                     </div>
-
                   </div>
 
-                  {/* -----------------------------------------
-                      PRICE SUMMARY
-                      ----------------------------------------- */}
-
+                  {/* Price summary */}
                   <div className="order-summary">
-
                     <div className="order-summary-row">
                       <span>Subtotal</span>
 
                       <span>
                         ₹
-                        {Number(
-                          order.totalAmount
-                        ).toLocaleString(
+                        {Number(order.totalAmount).toLocaleString(
                           "en-IN",
                           {
                             minimumFractionDigits: 2,
@@ -499,7 +404,6 @@ function OrderHistoryPage() {
 
                     <div className="order-summary-row">
                       <span>Delivery</span>
-
                       <span>Free</span>
                     </div>
 
@@ -508,9 +412,7 @@ function OrderHistoryPage() {
 
                       <strong>
                         ₹
-                        {Number(
-                          order.totalAmount
-                        ).toLocaleString(
+                        {Number(order.totalAmount).toLocaleString(
                           "en-IN",
                           {
                             minimumFractionDigits: 2,
@@ -519,33 +421,22 @@ function OrderHistoryPage() {
                         )}
                       </strong>
                     </div>
-
                   </div>
 
-                  {/* -----------------------------------------
-                      ACTION
-                      ----------------------------------------- */}
-
+                  {/* Order details link */}
                   <div className="order-card-footer">
-
-                    <Link
-                      to={`/orders/${order.orderId}`}
-                    >
+                    <Link to={`/orders/${order.orderId}`}>
                       VIEW ORDER DETAILS →
                     </Link>
-
                   </div>
-
                 </article>
               );
             })}
-
           </div>
         )}
-
       </div>
     </main>
   );
 }
 
-export default OrderHistoryPage;    
+export default OrderHistoryPage;

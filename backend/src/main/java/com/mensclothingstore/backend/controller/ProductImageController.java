@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.controller;
 
 import java.io.IOException;
@@ -42,22 +43,26 @@ public class ProductImageController {
     public ProductImageResponse uploadImage(
             @PathVariable Long productId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(defaultValue = "false") boolean primary)
+            @RequestParam(defaultValue = "false") boolean primary,
+            @RequestParam(required = false) String color)
             throws IOException {
 
         return productImageService.uploadImage(
                 productId,
                 file,
-                primary
+                primary,
+                color
         );
     }
+
+    // Delete an image
     @DeleteMapping("/{imageId}")
-public String deleteImage(
-        @PathVariable Long productId,
-        @PathVariable Long imageId) throws IOException {
+    public String deleteImage(
+            @PathVariable Long productId,
+            @PathVariable Long imageId) throws IOException {
 
-    productImageService.deleteImage(imageId);
+        productImageService.deleteImage(imageId);
 
-    return "Image deleted successfully.";
-}
+        return "Image deleted successfully.";
+    }
 }
