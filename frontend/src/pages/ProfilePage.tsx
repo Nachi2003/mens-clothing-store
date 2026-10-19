@@ -1,9 +1,35 @@
 import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { getCustomerAddress, saveCustomerAddress, type CustomerAddress } from "../services/customerAddressService";
 import { getLoggedInUser, logoutUser } from "../services/authService";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const user = getLoggedInUser();
+  const [address, setAddress] = useState<CustomerAddress>({ address: "", city: "", state: "", pincode: "" });
+  const [addressMessage, setAddressMessage] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    getCustomerAddress().then((saved) => {
+      if (saved) setAddress({ address: saved.address, city: saved.city, state: saved.state, pincode: saved.pincode });
+    }).catch(() => {});
+  }, [user?.userId]);
+
+  const handleSaveAddress = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingAddress(true);
+    setAddressMessage("");
+    try {
+      await saveCustomerAddress(address);
+      setAddressMessage("Delivery address saved successfully.");
+    } catch (error) {
+      setAddressMessage(error instanceof Error ? error.message : "Unable to save address.");
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   const handleLogout = () => {
     logoutUser();
@@ -55,6 +81,20 @@ export default function ProfilePage() {
             <span>{user.phone || "Not provided"}</span>
           </div>
         </div>
+
+        <form onSubmit={handleSaveAddress} style={{ marginBottom: 24, borderTop: "1px solid #eee", paddingTop: 18 }}>
+          <h2 style={{ fontSize: 18 }}>Saved Delivery Address</h2>
+          <label style={styles.label}>Address</label>
+          <textarea required maxLength={500} value={address.address} onChange={(e) => setAddress({ ...address, address: e.target.value })} rows={3} style={styles.addressInput} placeholder="House number, street, area" />
+          <label style={styles.label}>City</label>
+          <input required maxLength={100} value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} style={styles.addressInput} />
+          <label style={styles.label}>State</label>
+          <input required maxLength={100} value={address.state} onChange={(e) => setAddress({ ...address, state: e.target.value })} style={styles.addressInput} />
+          <label style={styles.label}>PIN Code</label>
+          <input required pattern="[0-9]{6}" maxLength={6} value={address.pincode} onChange={(e) => setAddress({ ...address, pincode: e.target.value })} style={styles.addressInput} />
+          {addressMessage && <p role="status">{addressMessage}</p>}
+          <button style={styles.button} type="submit" disabled={savingAddress}>{savingAddress ? "SAVING..." : "SAVE ADDRESS"}</button>
+        </form>
 
         <button
           style={styles.button}
@@ -138,6 +178,15 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     cursor: "pointer",
     marginBottom: "12px",
+  },
+  addressInput: {
+    display: "block",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "11px",
+    margin: "7px 0 14px",
+    border: "1px solid #ddd",
+    font: "inherit",
   },
   logoutButton: {
     width: "100%",

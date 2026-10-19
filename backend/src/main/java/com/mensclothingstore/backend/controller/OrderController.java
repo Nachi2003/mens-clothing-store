@@ -1,4 +1,6 @@
+
 package com.mensclothingstore.backend.controller;
+
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.mensclothingstore.backend.dto.OrderDetailsResponse;
 import com.mensclothingstore.backend.dto.OrderItemResponse;
 import com.mensclothingstore.backend.dto.OrderResponse;
+import com.mensclothingstore.backend.dto.PlaceBuyNowOrderRequest;
 import com.mensclothingstore.backend.dto.PlaceOrderRequest;
 import com.mensclothingstore.backend.service.OrderService;
 
@@ -69,6 +72,7 @@ public class OrderController {
         }
     }
 
+    // Normal checkout: places an order using the customer's cart.
     @PostMapping("/{userId}/orders")
     public OrderResponse placeOrder(
             @PathVariable Long userId,
@@ -78,6 +82,19 @@ public class OrderController {
         verifyCustomerAccess(userId, authentication);
 
         return orderService.placeOrder(userId, request);
+    }
+
+    // Buy Now checkout: places an order for one selected variant
+    // without changing or clearing the customer's existing cart.
+    @PostMapping("/{userId}/orders/buy-now")
+    public OrderResponse placeBuyNowOrder(
+            @PathVariable Long userId,
+            @Valid @RequestBody PlaceBuyNowOrderRequest request,
+            Authentication authentication) {
+
+        verifyCustomerAccess(userId, authentication);
+
+        return orderService.placeBuyNowOrder(userId, request);
     }
 
     @GetMapping("/{userId}/orders")
@@ -107,7 +124,7 @@ public class OrderController {
             return orderService.getOrderItems(orderId);
         }
 
-        // getOrderDetails checks that the order belongs to this customer.
+        // Verify that the order belongs to this customer.
         orderService.getOrderDetails(userId, orderId);
 
         return orderService.getOrderItems(orderId);
@@ -143,8 +160,32 @@ public class OrderController {
     @PutMapping("/admin/orders/{orderId}/status")
     public OrderResponse updateOrderStatus(
             @PathVariable Long orderId,
-            @RequestParam String status) {
+            @RequestParam String status,
+            @RequestParam(required = false) String reason) {
 
-        return orderService.updateOrderStatus(orderId, status);
+        return orderService.updateOrderStatus(orderId, status, reason);
+    }
+
+    @PutMapping("/{userId}/orders/{orderId}/acknowledge-rejection")
+    public OrderResponse acknowledgeRejection(
+            @PathVariable Long userId,
+            @PathVariable Long orderId,
+            Authentication authentication) {
+
+        verifyCustomerAccess(userId, authentication);
+
+        boolean isAdminOrStaff = authentication.getAuthorities()
+                .stream()
+                .anyMatch(authority ->
+                        authority.getAuthority().equals("ROLE_ADMIN")
+                        || authority.getAuthority().equals("ROLE_STAFF"));
+
+        if (isAdminOrStaff) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only the customer can acknowledge a rejection");
+        }
+
+        return orderService.acknowledgeRejection(userId, orderId);
     }
 }

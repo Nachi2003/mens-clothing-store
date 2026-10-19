@@ -15,6 +15,9 @@ public class OrderDetailsResponse {
     private String status;
     private LocalDateTime createdAt;
     private List<OrderItemResponse> items;
+    private String declineReason;
+    private boolean customerAcknowledgedRejection;
+    private LocalDateTime customerAcknowledgedAt;
 
     public OrderDetailsResponse(
             Long orderId,
@@ -26,7 +29,23 @@ public class OrderDetailsResponse {
             String status,
             LocalDateTime createdAt,
             List<OrderItemResponse> items) {
+        this(orderId, orderNumber, customerId, phone, address, totalAmount,
+                status, createdAt, items, null, false, null);
+    }
 
+    public OrderDetailsResponse(
+            Long orderId,
+            String orderNumber,
+            Long customerId,
+            String phone,
+            String address,
+            BigDecimal totalAmount,
+            String status,
+            LocalDateTime createdAt,
+            List<OrderItemResponse> items,
+            String declineReason,
+            boolean customerAcknowledgedRejection,
+            LocalDateTime customerAcknowledgedAt) {
         this.orderId = orderId;
         this.orderNumber = orderNumber;
         this.customerId = customerId;
@@ -36,6 +55,9 @@ public class OrderDetailsResponse {
         this.status = status;
         this.createdAt = createdAt;
         this.items = items;
+        this.declineReason = declineReason;
+        this.customerAcknowledgedRejection = customerAcknowledgedRejection;
+        this.customerAcknowledgedAt = customerAcknowledgedAt;
     }
 
     public Long getOrderId() {
@@ -72,5 +94,17 @@ public class OrderDetailsResponse {
 
     public List<OrderItemResponse> getItems() {
         return items;
+    }
+
+    public String getDeclineReason() {
+        return declineReason;
+    }
+
+    public boolean isCustomerAcknowledgedRejection() {
+        return customerAcknowledgedRejection;
+    }
+
+    public LocalDateTime getCustomerAcknowledgedAt() {
+        return customerAcknowledgedAt;
     }
 }

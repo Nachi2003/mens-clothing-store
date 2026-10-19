@@ -156,6 +156,18 @@ public class SecurityConfig {
                     "/api/admin/reports/**"
                 ).hasRole("ADMIN")
 
+                // Admin/Staff order management must precede the generic customer order-list matcher.
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/customers/admin/orders",
+                    "/api/customers/admin/orders/**"
+                ).hasAnyRole("ADMIN", "STAFF")
+
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/customers/admin/orders/**"
+                ).hasAnyRole("ADMIN", "STAFF")
+
                 // Customer order creation: Customer only
                 .requestMatchers(
                     HttpMethod.POST,
@@ -180,23 +192,17 @@ public class SecurityConfig {
                     "/api/customers/*/orders/*"
                 ).hasAnyRole("CUSTOMER", "ADMIN", "STAFF")
 
+                // Customer acknowledgement of a staff rejection
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/customers/*/orders/*/acknowledge-rejection"
+                ).hasRole("CUSTOMER")
+
                 // Customer order cancellation
                 .requestMatchers(
                     HttpMethod.PUT,
                     "/api/customers/*/orders/*"
                 ).hasRole("CUSTOMER")
-
-                // Admin/Staff order management
-                .requestMatchers(
-                    HttpMethod.GET,
-                    "/api/customers/admin/orders",
-                    "/api/customers/admin/orders/**"
-                ).hasAnyRole("ADMIN", "STAFF")
-
-                .requestMatchers(
-                    HttpMethod.PUT,
-                    "/api/customers/admin/orders/**"
-                ).hasAnyRole("ADMIN", "STAFF")
 
                 // Remaining endpoints are unchanged for now.
                 // Review them before production deployment.

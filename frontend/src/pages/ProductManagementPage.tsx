@@ -5,8 +5,6 @@ import {
     useRef,
     useState,
     type FormEvent,
-    type KeyboardEvent as ReactKeyboardEvent,
-    type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   getProducts,
@@ -51,17 +49,6 @@ const PAGE_SIZE = 8;
 // UI-only threshold used to highlight low stock. The backend does not
 // currently expose a per-variant reorder level.
 const LOW_STOCK_THRESHOLD = 5;
-
-const COLOR_PRESETS: { name: string; hex: string }[] = [
-    { name: "Black", hex: "#111111" },
-    { name: "White", hex: "#FFFFFF" },
-    { name: "Charcoal", hex: "#36454F" },
-    { name: "Navy", hex: "#1B2A49" },
-    { name: "Beige", hex: "#D8C8A8" },
-    { name: "Olive", hex: "#5B6236" },
-    { name: "Maroon", hex: "#6D1A2B" },
-    { name: "Sky blue", hex: "#87B5D9" },
-];
 
 const rupee = new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -190,263 +177,15 @@ function resolveColor(value: string): string | null {
         ? resolved.toUpperCase()
         : null;
 }
-
-/* ------------------------------------------------------------------ */
-/* Colour wheel + popover                                              */
-/* ------------------------------------------------------------------ */
-
-function ColorWheel({
-    hsv,
-    onChange,
-}: {
-    hsv: Hsv;
-    onChange: (next: Hsv) => void;
-}) {
-    const wheelRef = useRef<HTMLDivElement>(null);
-    const dragging = useRef(false);
-
-    function pick(event: ReactPointerEvent<HTMLDivElement>) {
-        const element = wheelRef.current;
-        if (!element) return;
-
-        const rect = element.getBoundingClientRect();
-        const radius = rect.width / 2;
-        const x = event.clientX - rect.left - radius;
-        const y = event.clientY - rect.top - radius;
-
-        const hue = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-        const saturation = Math.min(1, Math.hypot(x, y) / radius);
-
-        onChange({ ...hsv, h: hue, s: saturation });
-    }
-
-    function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-        const hueStep = event.shiftKey ? 10 : 2;
-        const satStep = event.shiftKey ? 0.1 : 0.02;
-
-        switch (event.key) {
-            case "ArrowLeft":
-                onChange({ ...hsv, h: (hsv.h - hueStep + 360) % 360 });
-                break;
-            case "ArrowRight":
-                onChange({ ...hsv, h: (hsv.h + hueStep) % 360 });
-                break;
-            case "ArrowUp":
-                onChange({ ...hsv, s: Math.min(1, hsv.s + satStep) });
-                break;
-            case "ArrowDown":
-                onChange({ ...hsv, s: Math.max(0, hsv.s - satStep) });
-                break;
-            default:
-                return;
-        }
-
-        event.preventDefault();
-    }
-
-    const angle = (hsv.h * Math.PI) / 180;
-    const markerLeft = 50 + Math.cos(angle) * hsv.s * 50;
-    const markerTop = 50 + Math.sin(angle) * hsv.s * 50;
-    const hex = hsvToHex(hsv);
-
-    return (
-        <div
-            ref={wheelRef}
-            className="pmx-wheel"
-            role="slider"
-            tabIndex={0}
-            aria-label="Color wheel"
-            aria-valuemin={0}
-            aria-valuemax={360}
-            aria-valuenow={Math.round(hsv.h)}
-            aria-valuetext={hex}
-            data-autofocus
-            onPointerDown={(event) => {
-                dragging.current = true;
-                event.currentTarget.setPointerCapture(event.pointerId);
-                pick(event);
-            }}
-            onPointerMove={(event) => {
-                if (dragging.current) pick(event);
-            }}
-            onPointerUp={() => {
-                dragging.current = false;
-            }}
-            onPointerCancel={() => {
-                dragging.current = false;
-            }}
-            onKeyDown={handleKeyDown}
-        >
-            <div className="pmx-wheel-shade" style={{ opacity: 1 - hsv.v }} />
-            <span
-                className="pmx-wheel-marker"
-                style={{
-                    left: `${markerLeft}%`,
-                    top: `${markerTop}%`,
-                    backgroundColor: hex,
-                }}
-            />
-        </div>
-    );
-}
-
-function ColorPopover({
-    initial,
-    onApply,
-    onClose,
-}: {
-    initial: string;
-    onApply: (hex: string) => void;
-    onClose: () => void;
-}) {
-    const dialogRef = useRef<HTMLDivElement>(null);
-    const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(initial));
-    const [hexText, setHexText] = useState(initial);
-
-    const hex = hsvToHex(hsv);
-    const hexInvalid = hexText.trim() !== "" && !normalizeHex(hexText);
-
-    useEffect(() => {
-        const previous = document.activeElement as HTMLElement | null;
-        dialogRef.current
-            ?.querySelector<HTMLElement>("[data-autofocus]")
-            ?.focus();
-
-        return () => previous?.focus();
-    }, []);
-
-    useEffect(() => {
-        function handleKey(event: KeyboardEvent) {
-            if (event.key === "Escape") {
-                event.stopPropagation();
-                onClose();
-            }
-        }
-
-        document.addEventListener("keydown", handleKey);
-        return () => document.removeEventListener("keydown", handleKey);
-    }, [onClose]);
-
-    function changeFromWheel(next: Hsv) {
-        setHsv(next);
-        setHexText(hsvToHex(next));
-    }
-
-    function setHexValue(value: string) {
-        const normalized = normalizeHex(value);
-        if (!normalized) return;
-        setHsv(hexToHsv(normalized));
-        setHexText(normalized);
-    }
-
-    return (
-        <>
-            <div className="pmx-backdrop" onClick={onClose} />
-            <div
-                ref={dialogRef}
-                className="pmx-popover"
-                role="dialog"
-                aria-label="Choose a color"
-            >
-                <ColorWheel hsv={hsv} onChange={changeFromWheel} />
-
-                <label className="pmx-slider">
-                    <span>Brightness</span>
-                    <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={Math.round(hsv.v * 100)}
-                        style={{
-                            background: `linear-gradient(to right, #000000, ${hsvToHex({
-                                ...hsv,
-                                v: 1,
-                            })})`,
-                        }}
-                        onChange={(event) =>
-                            changeFromWheel({
-                                ...hsv,
-                                v: Number(event.target.value) / 100,
-                            })
-                        }
-                    />
-                </label>
-
-                <div className="pmx-presets" role="group" aria-label="Common colors">
-                    {COLOR_PRESETS.map((preset) => (
-                        <button
-                            key={preset.hex}
-                            type="button"
-                            className="pmx-preset"
-                            style={{ backgroundColor: preset.hex }}
-                            title={preset.name}
-                            aria-label={`${preset.name} ${preset.hex}`}
-                            onClick={() => setHexValue(preset.hex)}
-                        />
-                    ))}
-                </div>
-
-                <div className="pmx-hex-row">
-                    <span
-                        className="pmx-swatch pmx-swatch-lg"
-                        style={{ backgroundColor: hex }}
-                        aria-hidden="true"
-                    />
-                    <label className="pmx-hex-field">
-                        <span>HEX</span>
-                        <input
-                            value={hexText}
-                            maxLength={7}
-                            spellCheck={false}
-                            autoComplete="off"
-                            aria-invalid={hexInvalid}
-                            aria-describedby={hexInvalid ? "pmx-hex-error" : undefined}
-                            onChange={(event) => {
-                                setHexText(event.target.value);
-                                setHexValue(event.target.value);
-                            }}
-                            placeholder="#1B2A49"
-                        />
-                    </label>
-                </div>
-                {hexInvalid && (
-                    <p id="pmx-hex-error" className="pmx-field-error">
-                        Enter six hex digits, for example #1B2A49.
-                    </p>
-                )}
-
-                <div className="pmx-popover-actions">
-                    <button type="button" className="pmx-btn" onClick={onClose}>
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        className="pmx-btn pmx-btn-primary"
-                        disabled={hexInvalid}
-                        onClick={() => onApply(hex)}
-                    >
-                        Use color
-                    </button>
-                </div>
-            </div>
-        </>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/* Variant editor                                                      */
-/* ------------------------------------------------------------------ */
-
 type VariantRow = {
     rowId: number;
     variantId?: number;
     size: string;
-    color: string; // saved to the backend exactly as entered (name or #HEX)
+    color: string;
     price: string;
     quantity: string;
-};
-
-type VariantField = keyof Omit<VariantRow, "rowId">;
+}
+type VariantField = keyof Omit<VariantRow, "rowId" | "variantId">;
 
 const createEmptyVariant = (rowId: number): VariantRow => ({
     rowId,
@@ -471,8 +210,6 @@ function VariantRowEditor({
     onChange: (field: VariantField, value: string) => void;
     onRemove: () => void;
 }) {
-    const [pickerOpen, setPickerOpen] = useState(false);
-    const preview = resolveColor(row.color);
     const label = `Variant ${index + 1}`;
 
     return (
@@ -496,47 +233,15 @@ function VariantRowEditor({
                 <label className="pmx-vlabel" htmlFor={`pmx-color-${row.rowId}`}>
                     Color
                 </label>
-                <div className="pmx-color-control">
-                    <button
-                        type="button"
-                        className="pmx-swatch-button"
-                        onClick={() => setPickerOpen(true)}
-                        disabled={disabled}
-                        aria-haspopup="dialog"
-                        aria-label={`Open color picker for ${label}`}
-                        title={preview ?? "Open color picker"}
-                    >
-                        <span
-                            className={`pmx-swatch${preview ? "" : " pmx-swatch-empty"}`}
-                            style={preview ? { backgroundColor: preview } : undefined}
-                        />
-                    </button>
-
-                    <input
-                        id={`pmx-color-${row.rowId}`}
-                        value={row.color}
-                        onChange={(event) => onChange("color", event.target.value)}
-                        onBlur={() => {
-                            const hex = normalizeHex(row.color);
-                            if (hex && hex !== row.color) onChange("color", hex);
-                        }}
-                        placeholder="Navy Blue or #1B2A49"
-                        maxLength={50}
-                        disabled={disabled}
-                        required
-                    />
-                </div>
-
-                {pickerOpen && (
-                    <ColorPopover
-                        initial={preview ?? "#000000"}
-                        onClose={() => setPickerOpen(false)}
-                        onApply={(hex) => {
-                            onChange("color", hex);
-                            setPickerOpen(false);
-                        }}
-                    />
-                )}
+                <input
+                    id={`pmx-color-${row.rowId}`}
+                    value={row.color}
+                    onChange={(event) => onChange("color", event.target.value)}
+                    placeholder="Navy Blue, Olive Green, or Black"
+                    maxLength={80}
+                    disabled={disabled}
+                    required
+                />
             </div>
 
             <label className="pmx-vcell">
@@ -597,8 +302,9 @@ type ProductRow = {
 
 export default function ProductManagementPage() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [selectedImageColors, setSelectedImageColors] = useState<string[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  // Each selected image can be assigned independently; multiple images may share a colour.
+  const [selectedImageColors, setSelectedImageColors] = useState<string[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -625,7 +331,6 @@ export default function ProductManagementPage() {
     const [bulkSizes, setBulkSizes] = useState<string[]>([]);
     const [bulkColor, setBulkColor] = useState("");
     const [bulkPrice, setBulkPrice] = useState("");
-    const [bulkColorPickerOpen, setBulkColorPickerOpen] = useState(false);
 
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -850,7 +555,6 @@ export default function ProductManagementPage() {
         setBulkSizes([]);
         setBulkColor("");
         setBulkPrice("");
-        setBulkColorPickerOpen(false);
         setSelectedImages([]);
         setSelectedImageColors([]);
         setImagePreviews((previous) => {
@@ -874,7 +578,6 @@ export default function ProductManagementPage() {
         setBulkSizes([]);
         setBulkColor("");
         setBulkPrice("");
-        setBulkColorPickerOpen(false);
         setSelectedImages([]);
         setSelectedImageColors([]);
         setImagePreviews((previous) => {
@@ -920,39 +623,40 @@ export default function ProductManagementPage() {
 
         const invalidFile = files.find((file) => !file.type.startsWith("image/"));
         if (invalidFile) {
-            setError(`\"${invalidFile.name}\" is not a valid image file.`);
+            setError(`"${invalidFile.name}" is not a valid image file.`);
             return;
         }
 
         const oversizedFile = files.find((file) => file.size > 5 * 1024 * 1024);
         if (oversizedFile) {
-            setError(`\"${oversizedFile.name}\" exceeds the 5 MB limit.`);
+            setError(`"${oversizedFile.name}" exceeds the 5 MB limit.`);
+            return;
+        }
+
+        const existingKeys = new Set(
+            selectedImages.map((file) => `${file.name}:${file.size}:${file.lastModified}`)
+        );
+        const newFiles = files.filter(
+            (file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`)
+        );
+        if (newFiles.length === 0) {
+            if (imageInputRef.current) imageInputRef.current.value = "";
             return;
         }
 
         setError("");
-        setSelectedImages((current) => {
-            const existingKeys = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
-            const newFiles = files.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`));
-            setImagePreviews((previous) => [
-                ...previous,
-                ...newFiles.map((file) => URL.createObjectURL(file)),
-            ]);
-            return [...current, ...newFiles];
-        });
+        setSelectedImages((current) => [...current, ...newFiles]);
+        setImagePreviews((current) => [
+            ...current,
+            ...newFiles.map((file) => URL.createObjectURL(file)),
+        ]);
+        // If there is only one colour variant, preselect it; otherwise require assignment per image.
         const availableColors = Array.from(
             new Set(variantRows.map((row) => row.color.trim()).filter(Boolean))
         );
         const defaultColor = availableColors.length === 1 ? availableColors[0] : "";
-        setSelectedImageColors((current) => {
-            const existingKeys = new Set(
-                selectedImages.map((file) => `${file.name}:${file.size}:${file.lastModified}`)
-            );
-            const newFiles = files.filter(
-                (file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`)
-            );
-            return [...current, ...newFiles.map(() => defaultColor)];
-        });
+        setSelectedImageColors((current) => [...current, ...newFiles.map(() => defaultColor)]);
+
         if (imageInputRef.current) imageInputRef.current.value = "";
     }
 
@@ -982,21 +686,28 @@ export default function ProductManagementPage() {
     async function uploadImagesForProduct(productId: number) {
         if (selectedImages.length === 0) return;
 
+        const missingColorIndex = selectedImageColors.findIndex((color) => !color.trim());
+        if (missingColorIndex !== -1) {
+            throw new Error(
+                `Please assign a colour to image "${selectedImages[missingColorIndex]?.name ?? `#${missingColorIndex + 1}`}" before saving.`
+            );
+        }
+
         setImageUploading(true);
         try {
-            // The current backend accepts one multipart file per request.
-            // Upload files sequentially so the primary image remains predictable
-            // and a failed request can be reported without losing prior uploads.
+            // The existing backend accepts one file per request. The same colour
+            // can be assigned to any number of images.
             for (let index = 0; index < selectedImages.length; index += 1) {
                 await uploadProductImage(
                     productId,
                     selectedImages[index],
                     index === 0,
-                    selectedImageColors[index]
+                    selectedImageColors[index].trim()
                 );
             }
 
             setSelectedImages([]);
+            setSelectedImageColors([]);
             setImagePreviews((previous) => {
                 previous.forEach((url) => URL.revokeObjectURL(url));
                 return [];
@@ -1040,21 +751,6 @@ export default function ProductManagementPage() {
             color: normalizeHex(row.color) || row.color.trim(),
         }));
 
-        if (selectedImages.length > 0) {
-            const availableColors = new Set(
-                cleanedRows.map((row) => row.color.trim().toLowerCase())
-            );
-            const unassignedIndex = selectedImageColors.findIndex(
-                (color) => !color.trim() || !availableColors.has(color.trim().toLowerCase())
-            );
-            if (unassignedIndex !== -1) {
-                setError(
-                    `Assign image ${unassignedIndex + 1} to one of this product's variant colors before saving.`
-                );
-                return;
-            }
-        }
-
         for (const row of cleanedRows) {
             if (!row.size || !row.color) {
                 setError("Please enter a size and color for every variant.");
@@ -1086,6 +782,14 @@ export default function ProductManagementPage() {
         if (new Set(combinations).size !== combinations.length) {
             setError("Duplicate size and color combinations are not allowed.");
             return;
+        }
+
+        if (selectedImages.length > 0) {
+            const missingColorIndex = selectedImageColors.findIndex((color) => !color.trim());
+            if (missingColorIndex !== -1) {
+                setError(`Please assign a colour to image "${selectedImages[missingColorIndex]?.name ?? `#${missingColorIndex + 1}`}".`);
+                return;
+            }
         }
 
         let savedProduct: Product | null = null;
@@ -1168,9 +872,6 @@ export default function ProductManagementPage() {
 
     const busy = loading || saving;
     const statValue = (value: number) => (loadedOnce ? String(value) : "—");
-    const imageColorOptions = Array.from(
-        new Set(variantRows.map((row) => row.color.trim()).filter(Boolean))
-    );
 
     return (
         <div className="pmx-page">
@@ -1317,8 +1018,7 @@ export default function ProductManagementPage() {
                                 onChange={(event) => handleImageChange(event.target.files)}
                             />
                             <small className="pmx-counter">
-                                Select multiple JPG, PNG, WEBP or other supported image files. Maximum 5 MB per image.
-                                Assign each image to one of the variant colors below. Images are uploaded when you save the product.
+                                Select multiple images (maximum 5 MB each). Assign a colour to every image below; several images may use the same colour. Images upload when you save the product.
                             </small>
 
                             {imagePreviews.length > 0 && (
@@ -1334,7 +1034,7 @@ export default function ProductManagementPage() {
                                                 {selectedImages[index]?.name}
                                             </div>
                                             <label style={{ display: "block", marginTop: 8, fontSize: 12 }}>
-                                                <span style={{ display: "block", marginBottom: 4 }}>Shirt color</span>
+                                                <span style={{ display: "block", marginBottom: 4 }}>Image colour *</span>
                                                 <select
                                                     value={selectedImageColors[index] ?? ""}
                                                     onChange={(event) =>
@@ -1344,13 +1044,15 @@ export default function ProductManagementPage() {
                                                             )
                                                         )
                                                     }
-                                                    disabled={saving || imageUploading || imageColorOptions.length === 0}
+                                                    disabled={saving || imageUploading}
                                                     required
                                                     style={{ width: "100%", minWidth: 0 }}
                                                 >
-                                                    <option value="">Choose color</option>
-                                                    {imageColorOptions.map((color) => (
-                                                        <option key={color} value={color}>{color}</option>
+                                                    <option value="">Select colour</option>
+                                                    {Array.from(
+                                                        new Set(variantRows.map((row) => row.color.trim()).filter(Boolean))
+                                                    ).map((color) => (
+                                                        <option key={color.toLowerCase()} value={color}>{color}</option>
                                                     ))}
                                                 </select>
                                             </label>
@@ -1374,7 +1076,7 @@ export default function ProductManagementPage() {
                             </p>
 
                             <section
-                                aria-label="Add multiple sizes for one color"
+                                aria-label="Add multiple sizes for one colour"
                                 style={{
                                     border: "1px solid var(--pmx-line, #e5e1da)",
                                     borderRadius: 12,
@@ -1384,40 +1086,19 @@ export default function ProductManagementPage() {
                                 }}
                             >
                                 <h4 style={{ margin: "0 0 12px", fontSize: 15 }}>
-                                    Add multiple sizes for one color
+                                    Add multiple sizes for one colour
                                 </h4>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: 12, alignItems: "end" }}>
                                     <div className="pmx-vcell">
                                         <label className="pmx-vlabel" htmlFor="pmx-bulk-color">Color</label>
-                                        <div className="pmx-color-control">
-                                            <button
-                                                type="button"
-                                                className="pmx-swatch-button"
-                                                disabled={saving}
-                                                onClick={() => setBulkColorPickerOpen(true)}
-                                                aria-label="Open color picker for selected sizes"
-                                                aria-haspopup="dialog"
-                                                title={resolveColor(bulkColor) ?? "Open color picker"}
-                                            >
-                                                <span className={`pmx-swatch${resolveColor(bulkColor) ? "" : " pmx-swatch-empty"}`} style={resolveColor(bulkColor) ? { backgroundColor: resolveColor(bulkColor)! } : undefined} />
-                                            </button>
-                                            <input
-                                                id="pmx-bulk-color"
-                                                value={bulkColor}
-                                                onChange={(event) => setBulkColor(event.target.value)}
-                                                onBlur={() => { const hex = normalizeHex(bulkColor); if (hex && hex !== bulkColor) setBulkColor(hex); }}
-                                                placeholder="Black or #111111"
-                                                maxLength={50}
-                                                disabled={saving}
-                                            />
-                                        </div>
-                                        {bulkColorPickerOpen && (
-                                            <ColorPopover
-                                                initial={resolveColor(bulkColor) ?? "#000000"}
-                                                onClose={() => setBulkColorPickerOpen(false)}
-                                                onApply={(hex) => { setBulkColor(hex); setBulkColorPickerOpen(false); }}
-                                            />
-                                        )}
+                                        <input
+                                            id="pmx-bulk-color"
+                                            value={bulkColor}
+                                            onChange={(event) => setBulkColor(event.target.value)}
+                                            placeholder="Black, Navy Blue, or Olive Green"
+                                            maxLength={80}
+                                            disabled={saving}
+                                        />
                                     </div>
                                     <label className="pmx-vcell">
                                         <span className="pmx-vlabel">Price per variant (₹)</span>
@@ -1476,8 +1157,8 @@ export default function ProductManagementPage() {
                             </div>
 
                             <p className="pmx-hint">
-                                Pick a color from the wheel, or type a name or HEX code. A name
-                                is saved as typed; a HEX code saves the exact color.
+                                Enter a colour name such as Navy Blue, Olive Green, Mustard, or Black.
+                                Upload each product image and assign it to the matching colour.
                             </p>
                         </div>
 

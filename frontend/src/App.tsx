@@ -10,28 +10,22 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProductManagementPage from "./pages/ProductManagementPage";
 import StaffAdminLoginPage from "./pages/StaffAdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import StaffDashboardPage from "./pages/StaffDashboardPage";
 import StaffManagementPage from "./pages/StaffManagementPage";
-
+import OrderDetailsPage from "./pages/OrderDetailsPage";
+import StaffOrdersPage from "./pages/StaffOrdersPage";
+import ReportsPage from "./pages/ReportsPage";
 import StaffAdminLayout from "./layouts/StaffAdminLayout";
 
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
 import "./App.css";
-
-function ComingSoonPage({ title }: { title: string }) {
-  return (
-    <section style={{ padding: "32px" }}>
-      <h2>{title}</h2>
-      <p>This page will be connected to the backend in the next step.</p>
-    </section>
-  );
-}
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +94,10 @@ function App() {
           element={<><Header /><OrderHistoryPage /><Footer /></>}
         />
         <Route
+          path="/order-success"
+          element={<><Header /><OrderSuccessPage /><Footer /></>}
+        />
+        <Route
           path="/profile"
           element={<><Header /><ProfilePage /><Footer /></>}
         />
@@ -132,11 +130,11 @@ function App() {
 />
           <Route
             path="/staff-admin/sales"
-            element={<ComingSoonPage title="Sales & Billing" />}
+            element={<StaffOrdersPage />}
           />
           <Route
             path="/staff-admin/reports"
-            element={<ComingSoonPage title="Reports" />}
+            element={<ReportsPage />}
           />
           <Route
             path="/staff-admin/categories"
@@ -146,6 +144,16 @@ function App() {
 
         {/* Unknown paths */}
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+  path="/orders/:orderId"
+  element={
+    <>
+      <Header />
+      <OrderDetailsPage />
+      <Footer />
+    </>
+  }
+/>
       </Routes>
     </BrowserRouter>
   );

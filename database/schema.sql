@@ -129,6 +129,8 @@ CREATE TABLE orders (
     address_snapshot VARCHAR(1000) NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PLACED',
+    payment_method VARCHAR(20) NOT NULL DEFAULT 'COD',
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_order_customer

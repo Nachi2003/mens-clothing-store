@@ -1,3 +1,4 @@
+
 import { getLoggedInUser } from "./authService";
 
 const API_BASE_URL =
@@ -6,33 +7,27 @@ const API_BASE_URL =
 export interface PlaceOrderRequest {
   phone: string;
   address: string;
+  paymentMethod: "COD" | "UPI";
 }
 
-export async function placeOrder(
-  request: PlaceOrderRequest
-) {
-  const user = getLoggedInUser();
+export interface PlaceBuyNowOrderRequest {
+  variantId: number;
+  quantity: number;
+  phone: string;
+  address: string;
+  paymentMethod: "COD" | "UPI";
+}
 
-  if (!user) {
-    throw new Error("Please log in before placing an order.");
-  }
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("latelier_token");
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/customers/${user.userId}/orders`,
-    {
-      method: "POST",
-      headers: {
-  "Content-Type": "application/json",
-  ...(localStorage.getItem("latelier_token")
-    ? {
-        Authorization: `Bearer ${localStorage.getItem("latelier_token")}`,
-      }
-    : {}),
-},
-      body: JSON.stringify(request),
-    }
-  );
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
+async function handleOrderResponse(response: Response) {
   if (!response.ok) {
     let message = "Unable to place your order.";
 
@@ -43,11 +38,60 @@ export async function placeOrder(
         message = errorData.message;
       }
     } catch {
-      // Ignore JSON parsing error
+      // Keep the default error message if the response is not JSON.
     }
 
     throw new Error(message);
   }
 
   return response.json();
+}
+
+/**
+ * Normal checkout.
+ * Places an order using the customer's backend cart.
+ */
+export async function placeOrder(request: PlaceOrderRequest) {
+  const user = getLoggedInUser();
+
+  if (!user) {
+    throw new Error("Please log in before placing an order.");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/customers/${user.userId}/orders`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(request),
+    }
+  );
+
+  return handleOrderResponse(response);
+}
+
+/**
+ * Buy Now checkout.
+ * Places an order for the selected variant and quantity.
+ * The backend endpoint must not modify the customer's existing cart.
+ */
+export async function placeBuyNowOrder(
+  request: PlaceBuyNowOrderRequest
+) {
+  const user = getLoggedInUser();
+
+  if (!user) {
+    throw new Error("Please log in before placing your order.");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/customers/${user.userId}/orders/buy-now`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(request),
+    }
+  );
+
+  return handleOrderResponse(response);
 }

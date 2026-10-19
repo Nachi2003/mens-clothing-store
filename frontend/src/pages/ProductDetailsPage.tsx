@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
 import { addToCart } from "../services/cartService";
@@ -12,6 +12,7 @@ interface ProductImage {
   imageId: number;
   imageUrl: string;
   primary: boolean;
+  color: string | null;
 }
 
 interface InventoryResponse {
@@ -35,8 +36,13 @@ const getFullImageUrl = (imageUrl: string) => {
   return `http://localhost:8080${imageUrl}`;
 };
 
+// Compare stored colour names consistently (e.g. "Navy Blue" and "navy blue").
+const normalizeColorName = (color: string | null | undefined) =>
+  (color ?? "").trim().toLocaleLowerCase();
+
 function ProductDetailsPage() {
   const { productId } = useParams();
+  const navigate = useNavigate();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -148,6 +154,31 @@ function ProductDetailsPage() {
     }
   }, [productId]);
 
+  // When a colour is selected, switch the main image to that colour's
+  // primary image (or first image) and keep thumbnails limited to that colour.
+  useEffect(() => {
+    if (!selectedVariant || images.length === 0) return;
+
+    const selectedColorKey = normalizeColorName(selectedVariant.color);
+    const colorImages = images.filter(
+      (image) => normalizeColorName(image.color) === selectedColorKey
+    );
+
+    const unassignedImages = images.filter(
+      (image) => !normalizeColorName(image.color)
+    );
+
+    const nextImage =
+      colorImages.find((image) => image.primary) ??
+      colorImages[0] ??
+      unassignedImages.find((image) => image.primary) ??
+      unassignedImages[0] ??
+      images.find((image) => image.primary) ??
+      images[0];
+
+    setSelectedImage(nextImage ?? null);
+  }, [images, selectedVariant?.color]);
+
   const decreaseQuantity = () => {
     setQuantity((currentQuantity) => Math.max(1, currentQuantity - 1));
   };
@@ -212,6 +243,45 @@ function ProductDetailsPage() {
     }
   };
 
+  const handleBuyNow = () => {
+    if (!selectedVariant || !product) {
+      alert("Please select a size and color.");
+      return;
+    }
+
+    if (stockQuantity <= 0) {
+      alert("This variant is currently out of stock.");
+      return;
+    }
+
+    if (quantity > stockQuantity) {
+      alert(
+        `Only ${stockQuantity} item${
+          stockQuantity === 1 ? "" : "s"
+        } available.`
+      );
+      setQuantity(stockQuantity);
+      return;
+    }
+
+    // Store only the temporary Buy Now selection. Do not add it to either cart.
+    const buyNowItem = {
+      productId: product.productId,
+      variantId: selectedVariant.variantId,
+      productName: product.productName,
+      size: selectedVariant.size,
+      color: selectedVariant.color,
+      price: selectedVariant.price,
+      quantity,
+      imageUrl: selectedImage
+        ? getFullImageUrl(selectedImage.imageUrl)
+        : "",
+    };
+
+    sessionStorage.setItem("buyNowItem", JSON.stringify(buyNowItem));
+    navigate("/checkout?mode=buy-now");
+  };
+
   if (loading) {
     return (
       <main className="product-page">
@@ -246,14 +316,29 @@ function ProductDetailsPage() {
     new Set(variants.map((variant) => variant.size))
   );
 
+  const selectedColorKey = normalizeColorName(selectedVariant?.color);
+  const selectedColorImages = images.filter(
+    (image) => normalizeColorName(image.color) === selectedColorKey && selectedColorKey.length > 0
+  );
+  const unassignedImages = images.filter(
+    (image) => !normalizeColorName(image.color)
+  );
+  // Prefer images explicitly assigned to the selected colour. If none exist,
+  // use unassigned images as a backward-compatible fallback for older products.
+  const visibleImages = selectedColorImages.length > 0
+    ? selectedColorImages
+    : unassignedImages.length > 0
+      ? unassignedImages
+      : images;
+
   return (
     <main className="product-page">
       <section className="product-main">
         {/* Image Gallery */}
         <div className="product-gallery">
-          {images.length > 1 && (
+          {visibleImages.length > 1 && (
             <div className="product-thumbnails">
-              {images.map((image) => (
+              {visibleImages.map((image) => (
                 <button
                   key={image.imageId}
                   type="button"
@@ -320,36 +405,103 @@ function ProductDetailsPage() {
               )}
             </div>
 
-            <div className="color-options">
+            <div className="color-options color-image-options">
               {colors.map((color) => {
                 const colorVariant = variants.find(
-                  (variant) => variant.color === color
+                  (variant) => normalizeColorName(variant.color) === normalizeColorName(color)
                 );
+                const colorKey = normalizeColorName(color);
+                const imageForColor =
+                  images.find((image) => normalizeColorName(image.color) === colorKey && image.primary) ??
+                  images.find((image) => normalizeColorName(image.color) === colorKey) ??
+                  images.find((image) => !normalizeColorName(image.color) && image.primary) ??
+                  images.find((image) => !normalizeColorName(image.color)) ??
+                  images.find((image) => image.primary) ??
+                  images[0];
 
                 return (
                   <button
                     key={color}
                     type="button"
                     className={
-                      selectedVariant?.color === color
-                        ? "color-button selected"
-                        : "color-button"
+                      normalizeColorName(selectedVariant?.color) === colorKey
+                        ? "color-image-button selected"
+                        : "color-image-button"
                     }
                     onClick={() => {
                       if (colorVariant) {
                         setSelectedVariant(colorVariant);
                         setQuantity(1);
                         loadVariantStock(colorVariant.variantId);
+                        const matchingImages = images.filter(
+                          (image) => normalizeColorName(image.color) === colorKey
+                        );
+                        const nextImage =
+                          matchingImages.find((image) => image.primary) ??
+                          matchingImages[0] ??
+                          images.find((image) => !normalizeColorName(image.color) && image.primary) ??
+                          images.find((image) => !normalizeColorName(image.color)) ??
+                          imageForColor ??
+                          null;
+                        setSelectedImage(nextImage);
                       }
                     }}
-                    aria-label={color}
+                    aria-label={`Select ${color}`}
                     title={color}
+                    aria-pressed={normalizeColorName(selectedVariant?.color) === colorKey}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 6,
+                      width: 88,
+                      padding: 5,
+                      border: normalizeColorName(selectedVariant?.color) === colorKey
+                        ? "2px solid #111827"
+                        : "1px solid #d1d5db",
+                      borderRadius: 8,
+                      background: "#ffffff",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
                   >
+                    {imageForColor ? (
+                      <img
+                        src={getFullImageUrl(imageForColor.imageUrl)}
+                        alt={`${color} ${product.productName}`}
+                        className="color-option-image"
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          height: 96,
+                          objectFit: "cover",
+                          borderRadius: 5,
+                          background: "#f3f4f6",
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="color-option-image-placeholder"
+                        aria-hidden="true"
+                        style={{
+                          display: "flex",
+                          width: "100%",
+                          height: 96,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f3f4f6",
+                          borderRadius: 5,
+                        }}
+                      >
+                        {color.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
                     <span
-                      className={`color-circle color-${color
-                        .toLowerCase()
-                        .replace(/\s+/g, "-")}`}
-                    />
+                      className="color-option-label"
+                      style={{ fontSize: 12, textAlign: "center", lineHeight: 1.2 }}
+                    >
+                      {color}
+                    </span>
                   </button>
                 );
               })}
@@ -447,6 +599,15 @@ function ProductDetailsPage() {
               disabled={stockQuantity <= 0}
             >
               {stockQuantity <= 0 ? "OUT OF STOCK" : "ADD TO CART"}
+            </button>
+
+            <button
+              type="button"
+              className="buy-now-button"
+              onClick={handleBuyNow}
+              disabled={stockQuantity <= 0}
+            >
+              {stockQuantity <= 0 ? "OUT OF STOCK" : "BUY NOW"}
             </button>
           </div>
 

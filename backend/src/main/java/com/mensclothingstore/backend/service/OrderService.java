@@ -10,12 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.mensclothingstore.backend.dto.OrderDetailsResponse;
 import com.mensclothingstore.backend.dto.OrderItemResponse;
 import com.mensclothingstore.backend.dto.OrderResponse;
+import com.mensclothingstore.backend.dto.PlaceBuyNowOrderRequest;
 import com.mensclothingstore.backend.dto.PlaceOrderRequest;
 import com.mensclothingstore.backend.entity.Cart;
 import com.mensclothingstore.backend.entity.CartItem;
 import com.mensclothingstore.backend.entity.Inventory;
 import com.mensclothingstore.backend.entity.Order;
 import com.mensclothingstore.backend.entity.OrderItem;
+import com.mensclothingstore.backend.entity.ProductVariant;
 import com.mensclothingstore.backend.entity.StockMovement;
 import com.mensclothingstore.backend.entity.User;
 import com.mensclothingstore.backend.repository.CartItemRepository;
@@ -23,6 +25,7 @@ import com.mensclothingstore.backend.repository.CartRepository;
 import com.mensclothingstore.backend.repository.InventoryRepository;
 import com.mensclothingstore.backend.repository.OrderItemRepository;
 import com.mensclothingstore.backend.repository.OrderRepository;
+import com.mensclothingstore.backend.repository.ProductVariantRepository;
 import com.mensclothingstore.backend.repository.StockMovementRepository;
 import com.mensclothingstore.backend.repository.UserRepository;
 
@@ -36,6 +39,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final InventoryRepository inventoryRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final ProductVariantRepository productVariantRepository;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -44,7 +48,8 @@ public class OrderService {
             CartItemRepository cartItemRepository,
             UserRepository userRepository,
             InventoryRepository inventoryRepository,
-            StockMovementRepository stockMovementRepository) {
+            StockMovementRepository stockMovementRepository,
+            ProductVariantRepository productVariantRepository) {
 
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -53,6 +58,7 @@ public class OrderService {
         this.userRepository = userRepository;
         this.inventoryRepository = inventoryRepository;
         this.stockMovementRepository = stockMovementRepository;
+        this.productVariantRepository = productVariantRepository;
     }
 
     @Transactional
@@ -151,6 +157,14 @@ public class OrderService {
         order.setAddressSnapshot(request.getAddress());
         order.setTotalAmount(totalAmount);
         order.setStatus("PLACED");
+        String paymentMethod = request.getPaymentMethod() == null
+                ? "COD" : request.getPaymentMethod().trim().toUpperCase();
+        if (!paymentMethod.equals("COD") && !paymentMethod.equals("UPI")) {
+            throw new RuntimeException("Unsupported payment method");
+        }
+        order.setPaymentMethod(paymentMethod);
+        // UPI remains pending until a real payment-provider verification flow confirms payment.
+        order.setPaymentStatus("PENDING");
 
         Order savedOrder
                 = orderRepository.save(order);
@@ -260,8 +274,107 @@ public class OrderService {
                 savedOrder.getStatus(),
                 savedOrder.getCreatedAt() != null
                 ? savedOrder.getCreatedAt()
-                : LocalDateTime.now()
+                : LocalDateTime.now(),
+                savedOrder.getDeclineReason(),
+                savedOrder.isCustomerAcknowledgedRejection(),
+                savedOrder.getCustomerAcknowledgedAt()
         );
+    }
+
+    /**
+     * Places an order for one explicitly selected product variant.
+     * Unlike normal checkout, this method does not read from or modify the cart.
+     */
+    @Transactional
+    public OrderResponse placeBuyNowOrder(
+            Long userId,
+            PlaceBuyNowOrderRequest request) {
+
+        User customer = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        ProductVariant variant = productVariantRepository.findById(request.getVariantId())
+                .orElseThrow(() -> new RuntimeException(
+                        "Product variant not found: " + request.getVariantId()));
+
+        Integer requestedQuantity = request.getQuantity();
+        if (requestedQuantity == null || requestedQuantity <= 0) {
+            throw new RuntimeException("Quantity must be at least 1");
+        }
+
+        // Lock inventory so concurrent orders cannot oversell this variant.
+        Inventory inventory = inventoryRepository
+                .findByVariantIdForUpdate(variant.getVariantId())
+                .orElseThrow(() -> new RuntimeException(
+                        "Inventory not found for variant " + variant.getVariantId()));
+
+        if (inventory.getQuantity() < requestedQuantity) {
+            throw new RuntimeException(
+                    "Insufficient stock for "
+                    + variant.getProduct().getProductName()
+                    + " " + variant.getSize()
+                    + " " + variant.getColor()
+                    + ". Available stock: " + inventory.getQuantity()
+                    + ", requested: " + requestedQuantity);
+        }
+
+        BigDecimal unitPrice = variant.getPrice();
+        BigDecimal totalAmount = unitPrice.multiply(
+                BigDecimal.valueOf(requestedQuantity));
+
+        Order order = new Order();
+        order.setOrderNumber(generateOrderNumber());
+        order.setCustomer(customer);
+        order.setPhoneSnapshot(request.getPhone());
+        order.setAddressSnapshot(request.getAddress());
+        order.setTotalAmount(totalAmount);
+        order.setStatus("PLACED");
+        String paymentMethod = request.getPaymentMethod() == null
+                ? "COD" : request.getPaymentMethod().trim().toUpperCase();
+        if (!paymentMethod.equals("COD") && !paymentMethod.equals("UPI")) {
+            throw new RuntimeException("Unsupported payment method");
+        }
+        order.setPaymentMethod(paymentMethod);
+        // UPI remains pending until a real payment-provider verification flow confirms payment.
+        order.setPaymentStatus("PENDING");
+
+        Order savedOrder = orderRepository.save(order);
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.setOrder(savedOrder);
+        orderItem.setVariant(variant);
+        orderItem.setQuantity(requestedQuantity);
+        orderItem.setUnitPrice(unitPrice);
+        orderItem.setDiscount(BigDecimal.ZERO);
+        orderItem.setFinalPrice(unitPrice);
+        orderItemRepository.save(orderItem);
+
+        inventory.setQuantity(inventory.getQuantity() - requestedQuantity);
+        inventoryRepository.save(inventory);
+
+        StockMovement movement = new StockMovement();
+        movement.setVariant(variant);
+        movement.setQuantityChange(-requestedQuantity);
+        movement.setMovementType("ONLINE_SALE");
+        movement.setReferenceId(savedOrder.getOrderNumber());
+        movement.setReason("Buy Now order");
+        stockMovementRepository.save(movement);
+
+        // Intentionally do not access or clear the customer's cart.
+        return new OrderResponse(
+                savedOrder.getOrderId(),
+                savedOrder.getOrderNumber(),
+                customer.getUserId(),
+                savedOrder.getPhoneSnapshot(),
+                savedOrder.getAddressSnapshot(),
+                savedOrder.getTotalAmount(),
+                savedOrder.getStatus(),
+                savedOrder.getCreatedAt() != null
+                        ? savedOrder.getCreatedAt()
+                        : LocalDateTime.now(),
+                savedOrder.getDeclineReason(),
+                savedOrder.isCustomerAcknowledgedRejection(),
+                savedOrder.getCustomerAcknowledgedAt());
     }
 
     public List<OrderResponse> getCustomerOrders(Long userId) {
@@ -282,16 +395,19 @@ public class OrderService {
                 order.getAddressSnapshot(),
                 order.getTotalAmount(),
                 order.getStatus(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                order.getDeclineReason(),
+                order.isCustomerAcknowledgedRejection(),
+                order.getCustomerAcknowledgedAt()
         ))
                 .toList();
     }
 
     public List<OrderItemResponse> getOrderItems(Long orderId) {
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(()
-                        -> new RuntimeException("Order not found"));
+      orderRepository.findById(orderId)
+        .orElseThrow(() ->
+                new RuntimeException("Order not found"));
 
         List<OrderItem> items
                 = orderItemRepository.findByOrder_OrderId(orderId);
@@ -380,7 +496,10 @@ public class OrderService {
                 order.getTotalAmount(),
                 order.getStatus(),
                 order.getCreatedAt(),
-                itemResponses
+                itemResponses,
+                order.getDeclineReason(),
+                order.isCustomerAcknowledgedRejection(),
+                order.getCustomerAcknowledgedAt()
         );
     }
 
@@ -465,7 +584,44 @@ public class OrderService {
                 savedOrder.getAddressSnapshot(),
                 savedOrder.getTotalAmount(),
                 savedOrder.getStatus(),
-                savedOrder.getCreatedAt()
+                savedOrder.getCreatedAt(),
+                savedOrder.getDeclineReason(),
+                savedOrder.isCustomerAcknowledgedRejection(),
+                savedOrder.getCustomerAcknowledgedAt()
+        );
+    }
+
+    @Transactional
+    public OrderResponse acknowledgeRejection(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!order.getCustomer().getUserId().equals(userId)) {
+            throw new RuntimeException("You are not authorized to acknowledge this order");
+        }
+        if (!"CANCELLED".equals(order.getStatus()) || order.getDeclineReason() == null
+                || order.getDeclineReason().isBlank()) {
+            throw new RuntimeException("There is no staff rejection to acknowledge");
+        }
+
+        if (!order.isCustomerAcknowledgedRejection()) {
+            order.setCustomerAcknowledgedRejection(true);
+            order.setCustomerAcknowledgedAt(LocalDateTime.now());
+            order = orderRepository.save(order);
+        }
+
+        return new OrderResponse(
+                order.getOrderId(),
+                order.getOrderNumber(),
+                order.getCustomer().getUserId(),
+                order.getPhoneSnapshot(),
+                order.getAddressSnapshot(),
+                order.getTotalAmount(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                order.getDeclineReason(),
+                order.isCustomerAcknowledgedRejection(),
+                order.getCustomerAcknowledgedAt()
         );
     }
 
@@ -501,13 +657,16 @@ public class OrderService {
                 order.getAddressSnapshot(),
                 order.getTotalAmount(),
                 order.getStatus(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                order.getDeclineReason(),
+                order.isCustomerAcknowledgedRejection(),
+                order.getCustomerAcknowledgedAt()
         ))
                 .toList();
     }
 
     @Transactional
-public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
+public OrderResponse updateOrderStatus(Long orderId, String newStatus, String reason) {
 
     Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("Order not found"));
@@ -516,6 +675,14 @@ public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
 
     // Admin cancellation
     if (newStatus.equals("CANCELLED")) {
+
+        String normalizedReason = reason == null ? "" : reason.trim();
+        if (normalizedReason.isEmpty()) {
+            throw new RuntimeException("A rejection reason is required");
+        }
+        if (normalizedReason.length() > 1000) {
+            throw new RuntimeException("Rejection reason cannot exceed 1000 characters");
+        }
 
         if (!currentStatus.equals("PLACED")) {
             throw new RuntimeException(
@@ -553,6 +720,9 @@ public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
         }
 
         order.setStatus("CANCELLED");
+        order.setDeclineReason(normalizedReason);
+        order.setCustomerAcknowledgedRejection(false);
+        order.setCustomerAcknowledgedAt(null);
 
     } else {
 
@@ -597,7 +767,10 @@ public OrderResponse updateOrderStatus(Long orderId, String newStatus) {
             savedOrder.getAddressSnapshot(),
             savedOrder.getTotalAmount(),
             savedOrder.getStatus(),
-            savedOrder.getCreatedAt()
+            savedOrder.getCreatedAt(),
+            savedOrder.getDeclineReason(),
+            savedOrder.isCustomerAcknowledgedRejection(),
+            savedOrder.getCustomerAcknowledgedAt()
     );
 }
 }

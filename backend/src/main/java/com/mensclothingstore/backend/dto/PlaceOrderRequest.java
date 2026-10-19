@@ -13,6 +13,16 @@ public class PlaceOrderRequest {
     @Size(max = 1000, message = "Address must not exceed 1000 characters")
     private String address;
 
+    private String paymentMethod = "COD";
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
     public String getPhone() {
         return phone;
     }
