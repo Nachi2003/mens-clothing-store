@@ -274,7 +274,16 @@ function OrderHistoryPage() {
           }),
         }));
 
-        if (!cancelled) setOrders(ordersWithImages);
+        // Newest orders first; use orderId as a stable fallback when timestamps match.
+        const newestFirst = [...ordersWithImages].sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          const safeA = Number.isFinite(dateA) ? dateA : 0;
+          const safeB = Number.isFinite(dateB) ? dateB : 0;
+          return safeB - safeA || Number(b.orderId) - Number(a.orderId);
+        });
+
+        if (!cancelled) setOrders(newestFirst);
       } catch (err) {
         console.error("Failed to load orders:", err);
         if (!cancelled) {

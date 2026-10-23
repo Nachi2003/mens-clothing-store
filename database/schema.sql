@@ -234,3 +234,22 @@ CREATE TABLE invoice_sequence (
 
 INSERT INTO invoice_sequence (sequence_id, next_number)
 VALUES (1, 1);
+
+-- Run this once against the existing mens_clothing_store database before starting the updated backend.
+-- Existing users, carts, orders, and addresses are not modified.
+CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+    challenge_id VARCHAR(36) PRIMARY KEY,
+    purpose VARCHAR(20) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(150) NULL,
+    name VARCHAR(100) NULL,
+    password_hash VARCHAR(255) NULL,
+    expires_at DATETIME NOT NULL,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    reset_token_hash VARCHAR(64) NULL,
+    created_at DATETIME NOT NULL,
+    last_sent_at DATETIME NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    INDEX idx_auth_otp_phone_purpose (phone, purpose),
+    INDEX idx_auth_otp_reset_token (reset_token_hash)
+);

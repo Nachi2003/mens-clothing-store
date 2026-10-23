@@ -27,26 +27,35 @@ export interface StaffAdminLoginData {
   role: "ADMIN" | "STAFF";
 }
 
-// Register a new customer
-export const registerUser = async (
-  data: RegisterData
-): Promise<User> => {
-  const response = await fetch(`${API_URL}/register`, {
+// Registration starts by requesting an email OTP. The account is created only after verification.
+export interface OtpStartResponse { challengeId: string; message: string; }
+export interface OtpVerifyData { challengeId: string; otp: string; }
+
+async function authRequest<T>(path: string, data: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message || "Request failed. Please try again.");
+  return result as T;
+}
 
-  const result = await response.json();
+export const registerUser = (data: RegisterData): Promise<OtpStartResponse> =>
+  authRequest<OtpStartResponse>("/register/request-otp", data);
 
-  if (!response.ok) {
-    throw new Error(result.message || "Registration failed");
-  }
+export const verifyRegistrationOtp = (data: OtpVerifyData): Promise<{message: string}> =>
+  authRequest("/register/verify-otp", data);
 
-  return result;
-};
+export const requestPasswordOtp = (email: string): Promise<OtpStartResponse> =>
+  authRequest("/forgot-password/request-otp", { email });
+
+export const verifyPasswordOtp = (data: OtpVerifyData): Promise<{resetToken: string; message: string}> =>
+  authRequest("/forgot-password/verify-otp", data);
+
+export const resetPassword = (resetToken: string, newPassword: string): Promise<{message: string}> =>
+  authRequest("/forgot-password/reset", { resetToken, newPassword });
 
 // Login an existing customer
 

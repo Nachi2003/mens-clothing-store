@@ -52,6 +52,11 @@ public class SecurityConfig {
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/users/register",
+                    "/api/users/register/request-otp",
+                    "/api/users/register/verify-otp",
+                    "/api/users/forgot-password/request-otp",
+                    "/api/users/forgot-password/verify-otp",
+                    "/api/users/forgot-password/reset",
                     "/api/users/login",
                     "/api/users/staff-admin/login"
                 ).permitAll()

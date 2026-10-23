@@ -17,6 +17,7 @@ import com.mensclothingstore.backend.entity.CartItem;
 import com.mensclothingstore.backend.entity.Inventory;
 import com.mensclothingstore.backend.entity.Order;
 import com.mensclothingstore.backend.entity.OrderItem;
+import com.mensclothingstore.backend.entity.ProductImage;
 import com.mensclothingstore.backend.entity.ProductVariant;
 import com.mensclothingstore.backend.entity.StockMovement;
 import com.mensclothingstore.backend.entity.User;
@@ -25,6 +26,7 @@ import com.mensclothingstore.backend.repository.CartRepository;
 import com.mensclothingstore.backend.repository.InventoryRepository;
 import com.mensclothingstore.backend.repository.OrderItemRepository;
 import com.mensclothingstore.backend.repository.OrderRepository;
+import com.mensclothingstore.backend.repository.ProductImageRepository;
 import com.mensclothingstore.backend.repository.ProductVariantRepository;
 import com.mensclothingstore.backend.repository.StockMovementRepository;
 import com.mensclothingstore.backend.repository.UserRepository;
@@ -40,6 +42,7 @@ public class OrderService {
     private final InventoryRepository inventoryRepository;
     private final StockMovementRepository stockMovementRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -49,7 +52,8 @@ public class OrderService {
             UserRepository userRepository,
             InventoryRepository inventoryRepository,
             StockMovementRepository stockMovementRepository,
-            ProductVariantRepository productVariantRepository) {
+            ProductVariantRepository productVariantRepository,
+            ProductImageRepository productImageRepository) {
 
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -59,6 +63,7 @@ public class OrderService {
         this.inventoryRepository = inventoryRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.productVariantRepository = productVariantRepository;
+        this.productImageRepository = productImageRepository;
     }
 
     @Transactional
@@ -403,6 +408,36 @@ public class OrderService {
                 .toList();
     }
 
+    /** Returns the image uploaded for this product and color, falling back to its primary image. */
+    private String findImageUrlForOrderItem(OrderItem item) {
+        Long productId = item.getVariant().getProduct().getProductId();
+        String orderedColor = item.getVariant().getColor();
+        List<ProductImage> images = productImageRepository.findByProduct_ProductId(productId);
+
+        if (orderedColor != null && !orderedColor.isBlank()) {
+            for (ProductImage image : images) {
+                if (image.getColor() != null
+                        && image.getColor().trim().equalsIgnoreCase(orderedColor.trim())
+                        && image.getImageUrl() != null
+                        && !image.getImageUrl().isBlank()) {
+                    return image.getImageUrl();
+                }
+            }
+        }
+
+        for (ProductImage image : images) {
+            if (image.isPrimary() && image.getImageUrl() != null
+                    && !image.getImageUrl().isBlank()) {
+                return image.getImageUrl();
+            }
+        }
+        return images.stream()
+                .map(ProductImage::getImageUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
     public List<OrderItemResponse> getOrderItems(Long orderId) {
 
       orderRepository.findById(orderId)
@@ -431,6 +466,7 @@ public class OrderService {
                                     .getProductName(),
                             item.getVariant().getSize(),
                             item.getVariant().getColor(),
+                            findImageUrlForOrderItem(item),
                             item.getQuantity(),
                             item.getUnitPrice(),
                             item.getDiscount(),
@@ -478,6 +514,7 @@ public class OrderService {
                                             .getProductName(),
                                     item.getVariant().getSize(),
                                     item.getVariant().getColor(),
+                                    findImageUrlForOrderItem(item),
                                     item.getQuantity(),
                                     item.getUnitPrice(),
                                     item.getDiscount(),

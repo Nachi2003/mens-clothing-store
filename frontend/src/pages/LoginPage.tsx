@@ -60,6 +60,9 @@ export default function LoginPage() {
             style={styles.input}
           />
 
+          <div style={{ textAlign: "right", marginTop: "-4px", marginBottom: "4px" }}>
+            <Link to="/forgot-password" style={styles.link}>Forgot Password?</Link>
+          </div>
           {error && <p style={styles.error}>{error}</p>}
 
           <button type="submit" disabled={loading} style={styles.button}>

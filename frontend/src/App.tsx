@@ -1,4 +1,4 @@
-
+import StaffBillingPage from "./pages/StaffBillingPage";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import CategoryManagementPage from "./pages/CategoryManagementPage";
@@ -8,6 +8,7 @@ import ProductDetailsPage from "./pages/ProductDetailsPage";
 import CartPage from "./pages/CartPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import OrderSuccessPage from "./pages/OrderSuccessPage";
@@ -15,7 +16,6 @@ import ProfilePage from "./pages/ProfilePage";
 import ProductManagementPage from "./pages/ProductManagementPage";
 import StaffAdminLoginPage from "./pages/StaffAdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
-import StaffDashboardPage from "./pages/StaffDashboardPage";
 import StaffManagementPage from "./pages/StaffManagementPage";
 import OrderDetailsPage from "./pages/OrderDetailsPage";
 import StaffOrdersPage from "./pages/StaffOrdersPage";
@@ -86,6 +86,10 @@ function App() {
           element={<><Header /><RegisterPage /><Footer /></>}
         />
         <Route
+          path="/forgot-password"
+          element={<><Header /><ForgotPasswordPage /><Footer /></>}
+        />
+        <Route
           path="/checkout"
           element={<><Header /><CheckoutPage /><Footer /></>}
         />
@@ -115,9 +119,9 @@ function App() {
             element={<AdminDashboardPage />}
           />
           <Route
-            path="/staff-admin/staff"
-            element={<StaffDashboardPage />}
-          />
+  path="/staff-admin/staff"
+  element={<StaffBillingPage />}
+/>
           <Route
             path="/staff-admin/team"
             element={<StaffManagementPage />}
