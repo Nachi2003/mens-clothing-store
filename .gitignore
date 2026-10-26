@@ -1,3 +1,5 @@
 frontend/.env
 backend/uploads/
 backend.zip
+
+data.sql

@@ -8,9 +8,13 @@ import { getProducts } from "../services/productService";
 
 import { getProductVariants } from "../services/productVariantService";
 
+import { getInventoryByVariantId } from "../services/inventoryService";
+
 import type { Product } from "../types/Product";
 
 import type { ProductVariant } from "../types/ProductVariant";
+
+import type { Inventory } from "../services/inventoryService";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -61,6 +65,11 @@ function ShopPage() {
 
   const [variants, setVariants] = useState<ProductVariant[]>([]);
 
+  const [inventory, setInventory] = useState<Inventory[]>([]);
+
+  // If public stock lookups fail, keep the catalog visible rather than hiding all products.
+  const [inventoryUnavailable, setInventoryUnavailable] = useState(false);
+
   const [productImages, setProductImages] = useState<
 
     Record<number, string>
@@ -74,6 +83,8 @@ function ShopPage() {
   // Search
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
 
   // Filters
 
@@ -108,109 +119,103 @@ function ShopPage() {
    */
 
   useEffect(() => {
+    let cancelled = false;
 
     const loadShopData = async () => {
+      setLoading(true);
+      setError("");
 
       try {
-
-        setLoading(true);
-
-        setError("");
-
-        const [productData, variantData] = await Promise.all([
-
+        // Products and variants must not be blocked by an inventory authorization error.
+        const [productResult, variantResult] = await Promise.allSettled([
           getProducts(),
-
           getProductVariants(),
-
         ]);
 
-        setProducts(productData);
+        if (productResult.status === "rejected") {
+          throw productResult.reason;
+        }
+        if (variantResult.status === "rejected") {
+          throw variantResult.reason;
+        }
 
+        const productData = productResult.value;
+        const variantData = variantResult.value;
+
+        if (cancelled) return;
+        setProducts(productData);
         setVariants(variantData);
 
-        /*
-
-         * Fetch images for every product
-
-         */
-
+        // Load all product images before requesting inventory.
         const imageResults = await Promise.all(
-
           productData.map(async (product) => {
-
             try {
-
               const response = await axios.get<ProductImage[]>(
-
                 `${API_BASE_URL}/api/products/${product.productId}/images`
-
               );
-
               const images = response.data;
-
               const primaryImage =
-
                 images.find((image) => image.primary) ?? images[0];
 
               return {
-
                 productId: product.productId,
-
                 imageUrl: primaryImage?.imageUrl ?? "",
-
               };
-
             } catch (err) {
-
               console.error(
-
                 `Failed to load image for product ${product.productId}:`,
-
                 err
-
               );
-
-              return {
-
-                productId: product.productId,
-
-                imageUrl: "",
-
-              };
-
+              return { productId: product.productId, imageUrl: "" };
             }
-
           })
-
         );
 
         const imageMap: Record<number, string> = {};
-
         imageResults.forEach((result) => {
-
           imageMap[result.productId] = result.imageUrl;
-
         });
-
+        if (cancelled) return;
         setProductImages(imageMap);
 
+        // This existing endpoint is explicitly public in SecurityConfig.
+        const activeVariants = variantData.filter((variant) => variant.active);
+        const inventoryResults = await Promise.all(
+          activeVariants.map(async (variant) => {
+            try {
+              return await getInventoryByVariantId(variant.variantId);
+            } catch (err) {
+              console.error(
+                `Failed to load inventory for variant ${variant.variantId}:`,
+                err
+              );
+              return null;
+            }
+          })
+        );
+
+        const successfulInventory = inventoryResults.filter(
+          (item): item is Inventory => item !== null
+        );
+        if (cancelled) return;
+        setInventory(successfulInventory);
+        setInventoryUnavailable(
+          activeVariants.length > 0 && successfulInventory.length === 0
+        );
       } catch (err) {
-
         console.error("Failed to load shop data:", err);
-
-        setError("Unable to load products.");
-
+        if (!cancelled) {
+          setError("Unable to load products. Please refresh the page.");
+        }
       } finally {
-
-        setLoading(false);
-
+        if (!cancelled) setLoading(false);
       }
-
     };
 
     loadShopData();
-
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /*
@@ -294,22 +299,20 @@ function ShopPage() {
    */
 
   const colors = useMemo(() => {
-
+    const stockByVariant = new Map<number, number>(
+      inventory.map((item) => [item.variantId, Number(item.quantity) || 0])
+    );
     const colorSet = new Set<string>();
 
     variants.forEach((variant) => {
-
-      if (variant.active && variant.color) {
-
-        colorSet.add(variant.color);
-
+      const stock = stockByVariant.get(variant.variantId) ?? 0;
+      if (variant.active && variant.color?.trim() && stock >= 1) {
+        colorSet.add(variant.color.trim());
       }
-
     });
 
-    return Array.from(colorSet).sort();
-
-  }, [variants]);
+    return Array.from(colorSet).sort((a, b) => a.localeCompare(b));
+  }, [variants, inventory]);
 
   /*
 
@@ -365,13 +368,74 @@ function ShopPage() {
 
   /*
 
+   * Only show products with at least one active variant in stock.
+   * Sold-out products remain available in the admin inventory.
+
+   */
+
+  const inStockProducts = useMemo(() => {
+    const stockByVariant = new Map<number, number>(
+      inventory.map((item) => [item.variantId, Number(item.quantity) || 0])
+    );
+
+    return products.filter((product) =>
+      variants.some((variant) => {
+        if (variant.productId !== product.productId || !variant.active) {
+          return false;
+        }
+
+        // If stock data is unavailable due to authorization/network failure,
+        // keep products visible so catalog images and details still render.
+        if (inventoryUnavailable) return true;
+
+        return (stockByVariant.get(variant.variantId) ?? 0) > 0;
+      })
+    );
+  }, [products, variants, inventory, inventoryUnavailable]);
+
+  /**
+   * Keyword search across product name, category, description, and variant
+   * color/size. Every typed word must match somewhere in the product data.
+   */
+  const matchesSearch = (product: Product, query: string): boolean => {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return true;
+
+    const variantTerms = variants
+      .filter((variant) => variant.productId === product.productId && variant.active)
+      .flatMap((variant) => [variant.color, variant.size]);
+
+    const searchableText = [
+      product.productName,
+      product.categoryName,
+      product.description ?? "",
+      ...variantTerms,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/[-_]+/g, " ");
+
+    return words.every((word) => searchableText.includes(word));
+  };
+
+  const searchSuggestions = useMemo(() => {
+    const query = searchTerm.trim();
+    if (!query) return [];
+    return inStockProducts
+      .filter((product) => matchesSearch(product, query))
+      .slice(0, 6);
+  }, [searchTerm, inStockProducts, variants]);
+
+  /*
+
    * Filter + Search + Sort
 
    */
 
   const filteredProducts = useMemo(() => {
 
-    let result = [...products];
+    let result = [...inStockProducts];
 
     /*
 
@@ -379,36 +443,10 @@ function ShopPage() {
 
      */
 
-    const search = searchTerm.trim().toLowerCase();
+    const search = searchTerm.trim();
 
     if (search) {
-
-      result = result.filter((product) => {
-
-        const productName =
-
-          product.productName?.toLowerCase() || "";
-
-        const category =
-
-          product.categoryName?.toLowerCase() || "";
-
-        const description =
-
-          product.description?.toLowerCase() || "";
-
-        return (
-
-          productName.includes(search) ||
-
-          category.includes(search) ||
-
-          description.includes(search)
-
-        );
-
-      });
-
+      result = result.filter((product) => matchesSearch(product, search));
     }
 
     /*
@@ -482,18 +520,14 @@ function ShopPage() {
 
         );
 
+        const stockByVariant = new Map<number, number>(
+          inventory.map((item) => [item.variantId, Number(item.quantity) || 0])
+        );
         return productVariants.some((variant) =>
-
+          (stockByVariant.get(variant.variantId) ?? 0) >= 1 &&
           selectedColors.some(
-
-            (color) =>
-
-              color.toLowerCase() ===
-
-              variant.color?.toLowerCase()
-
+            (color) => color.toLowerCase() === variant.color?.toLowerCase()
           )
-
         );
 
       });
@@ -636,9 +670,11 @@ function ShopPage() {
 
   }, [
 
-    products,
+    inStockProducts,
 
     variants,
+
+    inventory,
 
     searchTerm,
 
@@ -1166,26 +1202,123 @@ function ShopPage() {
 
           {/* SEARCH */}
 
-          <div className="shop-search">
-
-            <input
-
-              type="search"
-
-              placeholder="Search products..."
-
-              value={searchTerm}
-
-              onChange={(event) =>
-
-                setSearchTerm(event.target.value)
-
+          <div
+            className="shop-search"
+            style={{ position: "relative" }}
+            onBlur={(event) => {
+              const nextTarget = event.relatedTarget as Node | null;
+              if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+                setSearchFocused(false);
               }
-
+            }}
+          >
+            <input
+              type="search"
+              placeholder="Search by product, color, category, or size..."
+              value={searchTerm}
+              onFocus={() => setSearchFocused(true)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setActiveSuggestionIndex(-1);
+                setSearchFocused(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown" && searchSuggestions.length > 0) {
+                  event.preventDefault();
+                  setSearchFocused(true);
+                  setActiveSuggestionIndex((current) =>
+                    current < searchSuggestions.length - 1 ? current + 1 : 0
+                  );
+                } else if (event.key === "ArrowUp" && searchSuggestions.length > 0) {
+                  event.preventDefault();
+                  setActiveSuggestionIndex((current) =>
+                    current > 0 ? current - 1 : searchSuggestions.length - 1
+                  );
+                } else if (event.key === "Enter" && activeSuggestionIndex >= 0) {
+                  const selected = searchSuggestions[activeSuggestionIndex];
+                  if (selected) {
+                    event.preventDefault();
+                    window.location.href = `/product/${selected.productId}`;
+                  }
+                } else if (event.key === "Escape") {
+                  setSearchFocused(false);
+                  setActiveSuggestionIndex(-1);
+                }
+              }}
               aria-label="Search products"
-
+              aria-autocomplete="list"
+              aria-expanded={searchFocused && searchTerm.trim().length > 0}
             />
 
+            {searchTerm.trim().length > 0 && searchFocused && (
+              <div
+                role="listbox"
+                aria-label="Product suggestions"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 1000,
+                  background: "#fff",
+                  border: "1px solid #e5ddd1",
+                  borderRadius: 8,
+                  boxShadow: "0 10px 28px rgba(0,0,0,0.12)",
+                  maxHeight: 360,
+                  overflowY: "auto",
+                }}
+              >
+                {searchSuggestions.length > 0 ? (
+                  searchSuggestions.map((product, index) => {
+                    const rawImage = productImages[product.productId] ?? "";
+                    const suggestionImage = rawImage
+                      ? rawImage.startsWith("http")
+                        ? rawImage
+                        : `${API_BASE_URL}${rawImage}`
+                      : "";
+                    return (
+                      <Link
+                        key={product.productId}
+                        to={`/product/${product.productId}`}
+                        role="option"
+                        aria-selected={activeSuggestionIndex === index}
+                        onMouseDown={() => setSearchFocused(false)}
+                        onMouseEnter={() => setActiveSuggestionIndex(index)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "10px 14px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          background: activeSuggestionIndex === index ? "#f5f1eb" : "#fff",
+                          borderBottom: index < searchSuggestions.length - 1 ? "1px solid #eee8df" : "none",
+                        }}
+                      >
+                        {suggestionImage ? (
+                          <img
+                            src={suggestionImage}
+                            alt=""
+                            loading="lazy"
+                            style={{ width: 48, height: 56, objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
+                          />
+                        ) : (
+                          <span style={{ width: 48, height: 56, background: "#f1ece4", borderRadius: 4, flexShrink: 0 }} />
+                        )}
+                        <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                          <strong>{product.productName}</strong>
+                          <small style={{ color: "#777" }}>{product.categoryName}</small>
+                        </span>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: "14px", color: "#777" }}>
+                    No matching products found.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* SORT */}

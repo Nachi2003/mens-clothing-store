@@ -1,15 +1,21 @@
 
 package com.mensclothingstore.backend.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.mensclothingstore.backend.dto.CreateStaffRequest;
 import com.mensclothingstore.backend.dto.LoginRequest;
 import com.mensclothingstore.backend.dto.LoginResponse;
 import com.mensclothingstore.backend.dto.RegisterRequest;
 import com.mensclothingstore.backend.dto.RegisterResponse;
 import com.mensclothingstore.backend.dto.StaffAdminLoginRequest;
-import com.mensclothingstore.backend.dto.CreateStaffRequest;
+import com.mensclothingstore.backend.dto.UpdateStaffRequest;
 import com.mensclothingstore.backend.entity.User;
 import com.mensclothingstore.backend.repository.UserRepository;
 
@@ -30,6 +36,7 @@ public class UserService {
         this.jwtService = jwtService;
     }
 
+    // Customer registration
     public RegisterResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -46,13 +53,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
-        return new RegisterResponse(
-                savedUser.getUserId(),
-                savedUser.getName(),
-                savedUser.getEmail(),
-                savedUser.getPhone(),
-                savedUser.getRole()
-        );
+        return toRegisterResponse(savedUser);
     }
 
     // Customer login with JWT
@@ -138,7 +139,7 @@ public class UserService {
         );
     }
 
-    // Admin-created staff account
+    // Admin creates a staff account
     public RegisterResponse createStaff(
             CreateStaffRequest request) {
 
@@ -157,12 +158,91 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
+        return toRegisterResponse(savedUser);
+    }
+
+    // Admin views all staff accounts
+    public List<RegisterResponse> getAllStaff() {
+
+        return userRepository.findByRole("STAFF")
+                .stream()
+                .map(this::toRegisterResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Admin views one staff account
+    public RegisterResponse getStaffById(Long id) {
+
+        User user = findStaffById(id);
+
+        return toRegisterResponse(user);
+    }
+
+    // Admin edits staff name, email and phone
+    public RegisterResponse updateStaff(
+            Long id,
+            UpdateStaffRequest request) {
+
+        User user = findStaffById(id);
+
+        if (request.getName() == null
+                || request.getName().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Staff name is required");
+        }
+
+        if (request.getEmail() == null
+                || request.getEmail().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Staff email is required");
+        }
+
+        String name = request.getName().trim();
+        String email = request.getEmail().trim();
+
+        userRepository.findByEmail(email)
+                .filter(existing ->
+                        !existing.getUserId().equals(user.getUserId()))
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "Email is already registered");
+                });
+
+        user.setName(name);
+        user.setEmail(email);
+        user.setPhone(
+                request.getPhone() == null
+                        ? null
+                        : request.getPhone().trim());
+
+        User updatedUser = userRepository.save(user);
+
+        return toRegisterResponse(updatedUser);
+    }
+
+    // Find a user only if their role is STAFF
+    private User findStaffById(Long id) {
+
+        return userRepository.findByUserId(id)
+                .filter(user -> "STAFF".equals(user.getRole()))
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Staff member not found"));
+    }
+
+    // Return safe user details without password hash
+    private RegisterResponse toRegisterResponse(User user) {
+
         return new RegisterResponse(
-                savedUser.getUserId(),
-                savedUser.getName(),
-                savedUser.getEmail(),
-                savedUser.getPhone(),
-                savedUser.getRole()
+                user.getUserId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getRole()
         );
     }
 }

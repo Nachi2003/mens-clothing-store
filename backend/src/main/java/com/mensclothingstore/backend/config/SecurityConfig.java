@@ -1,3 +1,4 @@
+
 package com.mensclothingstore.backend.config;
 
 import java.util.List;
@@ -46,7 +47,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
 
                 // CORS preflight requests
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(
+                    HttpMethod.OPTIONS, "/**"
+                ).permitAll()
 
                 // Public authentication endpoints
                 .requestMatchers(
@@ -61,10 +64,27 @@ public class SecurityConfig {
                     "/api/users/staff-admin/login"
                 ).permitAll()
 
-                // Only Admin can create staff accounts
+                // ==========================================
+                // STAFF MANAGEMENT: ADMIN ONLY
+                // ==========================================
+
+                // Create a staff account
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/users/staff"
+                ).hasRole("ADMIN")
+
+                // View all staff and individual staff details
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/users/staff",
+                    "/api/users/staff/**"
+                ).hasRole("ADMIN")
+
+                // Edit staff details
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/users/staff/**"
                 ).hasRole("ADMIN")
 
                 // Public product browsing
@@ -100,7 +120,6 @@ public class SecurityConfig {
                 ).hasAnyRole("ADMIN", "STAFF")
 
                 // Public stock checks for customer cart
-                // Keep this before broader inventory rules
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/inventory/variant/**"
@@ -161,7 +180,8 @@ public class SecurityConfig {
                     "/api/admin/reports/**"
                 ).hasRole("ADMIN")
 
-                // Admin/Staff order management must precede the generic customer order-list matcher.
+                // Admin/Staff order management
+                // Keep before the generic customer order matchers
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/customers/admin/orders",
@@ -185,7 +205,7 @@ public class SecurityConfig {
                     "/api/customers/*/orders"
                 ).hasRole("CUSTOMER")
 
-                // Order items: authenticated customer or staff
+                // Order items: Customer or Admin/Staff
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/customers/orders/*/items"
@@ -197,7 +217,7 @@ public class SecurityConfig {
                     "/api/customers/*/orders/*"
                 ).hasAnyRole("CUSTOMER", "ADMIN", "STAFF")
 
-                // Customer acknowledgement of a staff rejection
+                // Customer acknowledgement of staff rejection
                 .requestMatchers(
                     HttpMethod.PUT,
                     "/api/customers/*/orders/*/acknowledge-rejection"
@@ -209,8 +229,7 @@ public class SecurityConfig {
                     "/api/customers/*/orders/*"
                 ).hasRole("CUSTOMER")
 
-                // Remaining endpoints are unchanged for now.
-                // Review them before production deployment.
+                // Existing fallback rule
                 .anyRequest().permitAll()
             )
             .addFilterBefore(
@@ -224,7 +243,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration configuration =
+                new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
             "http://localhost:5173",
@@ -248,9 +268,11 @@ public class SecurityConfig {
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
-            new UrlBasedCorsConfigurationSource();
+                new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration(
+            "/**", configuration
+        );
 
         return source;
     }

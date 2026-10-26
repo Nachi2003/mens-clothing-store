@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { getInventoryByVariantId } from "../services/inventoryService";
+import type { Inventory } from "../services/inventoryService";
 
 interface Product {
   productId: number;
@@ -70,191 +72,196 @@ function HomePage() {
 
     async function loadHomeData() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products`);
+        // Products and variants are public browsing data. Do not make
+        // homepage images depend on the admin-only inventory list endpoint.
+        const [productResponse, variantResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/products`),
+          fetch(`${API_BASE_URL}/api/product-variants`),
+        ]);
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch products");
+        if (!productResponse.ok) {
+          throw new Error(`Failed to fetch products (${productResponse.status})`);
+        }
+        if (!variantResponse.ok) {
+          throw new Error(
+            `Failed to fetch product variants (${variantResponse.status})`
+          );
         }
 
-        const products: Product[] = await response.json();
+        const [products, variants]: [Product[], ProductVariant[]] =
+          await Promise.all([
+            productResponse.json(),
+            variantResponse.json(),
+          ]);
 
-        /*
-         * ==========================================
-         * CATEGORY IMAGES
-         * ==========================================
-         */
-
-        const imageMap: Record<string, string> = {};
-
-        await Promise.all(
-          categories.map(async (category) => {
-            const matchingProducts = products.filter((product) => {
-  const productCategory = (product.categoryName ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "");
-
-  const targetCategory = category.name
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "");
-
-  if (targetCategory === "tshirts") {
-    return ["tshirt", "tshirts", "tee", "tees"].includes(
-      productCategory
-    );
-  }
-
-  return productCategory === targetCategory ||
-    productCategory === category.slug.toLowerCase().replace(/[\s_-]+/g, "");
-});
-
-            if (matchingProducts.length === 0) return;
-
-            // Random product from this category
-            const randomIndex = Math.floor(
-              Math.random() * matchingProducts.length
-            );
-
-            const selectedProduct = matchingProducts[randomIndex];
-
+        // Retrieve images independently, so inventory errors cannot hide them.
+        const imageEntries = await Promise.all(
+          products.map(async (product) => {
             try {
-              const imageResponse = await fetch(
-                `${API_BASE_URL}/api/products/${selectedProduct.productId}/images`
+              const response = await fetch(
+                `${API_BASE_URL}/api/products/${product.productId}/images`
               );
 
-              if (!imageResponse.ok) return;
+              if (!response.ok) {
+                console.error(
+                  `Image request failed for product ${product.productId}: ${response.status}`
+                );
+                return [product.productId, ""] as const;
+              }
 
-              const images: ProductImage[] =
-                await imageResponse.json();
-
-              if (!Array.isArray(images) || images.length === 0) return;
-
-              const primaryImage = images.find(
-                (image) =>
-                  image.primary ||
-                  image.isPrimary ||
-                  image.is_primary
-              );
+              const images: ProductImage[] = await response.json();
+              if (!Array.isArray(images) || images.length === 0) {
+                return [product.productId, ""] as const;
+              }
 
               const selectedImage =
-                primaryImage || images[0];
+                images.find(
+                  (image) =>
+                    image.primary || image.isPrimary || image.is_primary
+                ) ?? images[0];
 
-              const imageUrl =
-                selectedImage.imageUrl ||
-                selectedImage.image_url;
+              const rawImageUrl =
+                selectedImage.imageUrl || selectedImage.image_url || "";
 
-              if (imageUrl) {
-                imageMap[category.slug] =
-                  normalizeImageUrl(imageUrl);
-              }
+              return [
+                product.productId,
+                rawImageUrl ? normalizeImageUrl(rawImageUrl) : "",
+              ] as const;
             } catch (error) {
               console.error(
-                `Failed to load image for ${category.name}:`,
+                `Failed to load image for product ${product.productId}:`,
                 error
               );
+              return [product.productId, ""] as const;
             }
           })
         );
 
-        /*
-         * ==========================================
-         * TRENDING PRODUCTS
-         * ==========================================
-         */
+        const imagesByProduct = new Map<number, string>(imageEntries);
 
-        const productsToShow = products.slice(0, 4);
-
-        const trendingResults = await Promise.all(
-          productsToShow.map(async (product) => {
+        // The per-variant stock endpoint is already public in SecurityConfig.
+        // If a stock lookup fails, keep loading the homepage rather than
+        // preventing category and product images from rendering.
+        const activeVariants = variants.filter((variant) => variant.active);
+        const stockResults = await Promise.all(
+          activeVariants.map(async (variant) => {
             try {
-              const [imageResponse, variantResponse] =
-                await Promise.all([
-                  fetch(
-                    `${API_BASE_URL}/api/products/${product.productId}/images`
-                  ),
-                  fetch(
-                    `${API_BASE_URL}/api/product-variants`
-                  ),
-                ]);
-
-              let imageUrl = "";
-
-              if (imageResponse.ok) {
-                const images: ProductImage[] =
-                  await imageResponse.json();
-
-                if (Array.isArray(images) && images.length > 0) {
-                  const primaryImage = images.find(
-                    (image) =>
-                      image.primary ||
-                      image.isPrimary ||
-                      image.is_primary
-                  );
-
-                  const selectedImage =
-                    primaryImage || images[0];
-
-                  const rawImageUrl =
-                    selectedImage.imageUrl ||
-                    selectedImage.image_url;
-
-                  if (rawImageUrl) {
-                    imageUrl = normalizeImageUrl(rawImageUrl);
-                  }
-                }
-              }
-
-              let variants: ProductVariant[] = [];
-
-              if (variantResponse.ok) {
-                variants = await variantResponse.json();
-              }
-
-              const productVariants = variants.filter(
-                (variant) =>
-                  variant.productId === product.productId &&
-                  variant.active
+              const item: Inventory = await getInventoryByVariantId(
+                variant.variantId
               );
-
-              if (productVariants.length === 0) {
-                return null;
-              }
-
-              // Display the lowest active variant price
-              const lowestPrice = Math.min(
-                ...productVariants.map(
-                  (variant) => Number(variant.price)
-                )
-              );
-
-              const firstVariant = productVariants[0];
-
               return {
-                product,
-                imageUrl,
-                color: firstVariant.color,
-                price: lowestPrice,
+                variantId: variant.variantId,
+                quantity: Number(item.quantity) || 0,
               };
             } catch (error) {
-              console.error(
-                `Failed to load product ${product.productId}:`,
+              console.warn(
+                `Could not load stock for variant ${variant.variantId}:`,
                 error
               );
-
               return null;
             }
           })
         );
 
+        const validStockResults = stockResults.filter(
+          (item): item is { variantId: number; quantity: number } =>
+            item !== null
+        );
+
+        const stockByVariant = new Map<number, number>(
+          validStockResults.map((item) => [item.variantId, item.quantity])
+        );
+
+        const inStockProducts =
+          validStockResults.length > 0
+            ? products.filter((product) =>
+                activeVariants.some(
+                  (variant) =>
+                    variant.productId === product.productId &&
+                    (stockByVariant.get(variant.variantId) ?? 0) > 0
+                )
+              )
+            : products;
+
+        // Category cards use images uploaded for products in that category.
+        // If stock is unavailable, use the product catalog as the image source.
+        const categorySourceProducts =
+          inStockProducts.length > 0 ? inStockProducts : products;
+        const imageMap: Record<string, string> = {};
+
+        categories.forEach((category) => {
+          const matchingProducts = categorySourceProducts.filter((product) => {
+            const productCategory = (product.categoryName ?? "")
+              .trim()
+              .toLowerCase()
+              .replace(/[\\s_-]+/g, "");
+
+            const targetCategory = category.name
+              .trim()
+              .toLowerCase()
+              .replace(/[\\s_-]+/g, "");
+
+            if (targetCategory === "tshirts") {
+              return ["tshirt", "tshirts", "tee", "tees"].includes(
+                productCategory
+              );
+            }
+
+            return (
+              productCategory === targetCategory ||
+              productCategory ===
+                category.slug.toLowerCase().replace(/[\\s_-]+/g, "")
+            );
+          });
+
+          // Prefer a product with an image, instead of randomly selecting one
+          // whose image list is empty.
+          const selectedProduct = matchingProducts.find(
+            (product) => Boolean(imagesByProduct.get(product.productId))
+          );
+
+          if (selectedProduct) {
+            imageMap[category.slug] =
+              imagesByProduct.get(selectedProduct.productId) ?? "";
+          }
+        });
+
+        // Trending products use in-stock products when stock data is available.
+        const productsToShow = (inStockProducts.length > 0
+          ? inStockProducts
+          : products
+        ).slice(0, 4);
+
+        const trendingResults: TrendingProduct[] = productsToShow
+          .map((product) => {
+            const productVariants = activeVariants.filter(
+              (variant) => variant.productId === product.productId
+            );
+
+            if (productVariants.length === 0) {
+              return null;
+            }
+
+            const prices = productVariants
+              .map((variant) => Number(variant.price))
+              .filter((price) => Number.isFinite(price));
+
+            if (prices.length === 0) {
+              return null;
+            }
+
+            return {
+              product,
+              imageUrl: imagesByProduct.get(product.productId) ?? "",
+              color: productVariants[0].color,
+              price: Math.min(...prices),
+            };
+          })
+          .filter((item): item is TrendingProduct => item !== null);
+
         if (!cancelled) {
           setCategoryImages(imageMap);
-
-          setTrendingProducts(
-            trendingResults.filter(
-              (item): item is TrendingProduct => item !== null
-            )
-          );
+          setTrendingProducts(trendingResults);
         }
       } catch (error) {
         console.error("Failed to load homepage data:", error);
