@@ -77,7 +77,6 @@ const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 /* Colour helpers                                                      */
 /* ------------------------------------------------------------------ */
 
-type Hsv = { h: number; s: number; v: number };
 
 function isHexColor(value: string): boolean {
     return /^#[0-9a-fA-F]{6}$/.test(value.trim());
@@ -96,41 +95,6 @@ function normalizeHex(value: string): string {
     }
 
     return "";
-}
-
-function hexToHsv(hex: string): Hsv {
-    const n = parseInt(hex.slice(1), 16);
-    const r = ((n >> 16) & 255) / 255;
-    const g = ((n >> 8) & 255) / 255;
-    const b = (n & 255) / 255;
-
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const d = max - min;
-
-    let h = 0;
-    if (d !== 0) {
-        if (max === r) h = ((g - b) / d) % 6;
-        else if (max === g) h = (b - r) / d + 2;
-        else h = (r - g) / d + 4;
-        h *= 60;
-        if (h < 0) h += 360;
-    }
-
-    return { h, s: max === 0 ? 0 : d / max, v: max };
-}
-
-function hsvToHex({ h, s, v }: Hsv): string {
-    const channel = (n: number) => {
-        const k = (n + h / 60) % 6;
-        return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
-    };
-    const toHex = (x: number) =>
-        Math.round(x * 255)
-            .toString(16)
-            .padStart(2, "0");
-
-    return `#${toHex(channel(5))}${toHex(channel(3))}${toHex(channel(1))}`.toUpperCase();
 }
 
 const CSS_GLOBAL_KEYWORDS = new Set([

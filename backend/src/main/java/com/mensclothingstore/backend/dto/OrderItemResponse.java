@@ -9,6 +9,7 @@ public class OrderItemResponse {
     private String productName;
     private String size;
     private String color;
+    private String imageUrl;
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal discount;
@@ -21,6 +22,7 @@ public class OrderItemResponse {
             String productName,
             String size,
             String color,
+            String imageUrl,
             Integer quantity,
             BigDecimal unitPrice,
             BigDecimal discount,
@@ -32,6 +34,7 @@ public class OrderItemResponse {
         this.productName = productName;
         this.size = size;
         this.color = color;
+        this.imageUrl = imageUrl;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
         this.discount = discount;
@@ -57,6 +60,10 @@ public class OrderItemResponse {
 
     public String getColor() {
         return color;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
     }
 
     public Integer getQuantity() {

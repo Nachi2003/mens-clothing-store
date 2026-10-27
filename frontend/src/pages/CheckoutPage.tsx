@@ -174,6 +174,8 @@ function CheckoutPage() {
     setError("");
 
     try {
+      let placedOrder: Record<string, unknown>;
+
       if (isBuyNow) {
         const savedSelection = sessionStorage.getItem("buyNowItem");
         if (!savedSelection) {
@@ -181,61 +183,45 @@ function CheckoutPage() {
         }
 
         const item = JSON.parse(savedSelection) as BuyNowItem;
-        const placedOrder = await placeBuyNowOrder({
+        placedOrder = await placeBuyNowOrder({
           variantId: Number(item.variantId),
           quantity: Number(item.quantity),
           phone: phone.trim(),
           address: address.trim(),
           paymentMethod,
-        });
+        }) as unknown as Record<string, unknown>;
 
-        sessionStorage.setItem("lastPlacedOrder", JSON.stringify({
-          ...placedOrder,
-          paymentMethod,
-          items: checkoutItems,
-          totalAmount: total,
-        }));
-        // Remove only the temporary Buy Now selection. Keep the user's cart intact.
+        // Remove only the temporary Buy Now selection. Keep unrelated cart items intact.
         sessionStorage.removeItem("buyNowItem");
       } else {
-        const placedOrder = await placeOrder({
-  phone: phone.trim(),
-  address: address.trim(),
-  paymentMethod,
-});
-
-sessionStorage.setItem(
-  "lastPlacedOrder",
-  JSON.stringify({
-    ...placedOrder,
-    paymentMethod,
-    items: checkoutItems,
-    totalAmount: total,
-    phone: phone.trim(),
-    address: address.trim(),
-  })
-);
-
-clearCart();
-
-        // Save the confirmed order and the checkout snapshot for the success page.
-        sessionStorage.setItem("lastPlacedOrder", JSON.stringify({
-          ...placedOrder,
-          phoneSnapshot: phone.trim(),
-          addressSnapshot: address.trim(),
+        placedOrder = await placeOrder({
+          phone: phone.trim(),
+          address: address.trim(),
           paymentMethod,
-          paymentStatus: placedOrder?.paymentStatus ?? "PENDING",
-          items: checkoutItems,
-          totalAmount: placedOrder?.totalAmount ?? total,
-        }));
+        }) as unknown as Record<string, unknown>;
 
-        // Clear the cart only after the backend confirms the order was created.
+        // Clear the cart only after the backend confirms normal checkout.
         clearCart();
       }
 
-      // Show the congratulations page only for normal cart checkout.
-      // Buy Now goes to the orders list and leaves unrelated cart items untouched.
-     navigate("/order-success");
+      // Use one consistent success-page payload for both purchase paths.
+      // Buy Now still submits only its selected variant and never clears the cart.
+      sessionStorage.setItem(
+        "lastPlacedOrder",
+        JSON.stringify({
+          ...placedOrder,
+          paymentMethod,
+          paymentStatus: placedOrder.paymentStatus ?? "PENDING",
+          items: checkoutItems,
+          totalAmount: placedOrder.totalAmount ?? total,
+          phone: phone.trim(),
+          address: address.trim(),
+          phoneSnapshot: phone.trim(),
+          addressSnapshot: address.trim(),
+        })
+      );
+
+      navigate("/order-success", { replace: true });
     } catch (submitError) {
       console.error("Checkout error:", submitError);
       const message = submitError instanceof Error

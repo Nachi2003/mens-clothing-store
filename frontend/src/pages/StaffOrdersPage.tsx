@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAuthToken, getLoggedInUser } from "../services/authService";
+import { getProductImageUrl } from "../services/productImageService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -8,6 +9,7 @@ interface StaffOrderItem {
   productName: string;
   size: string;
   color: string;
+  imageUrl?: string | null;
   quantity: number;
   subtotal: number;
 }
@@ -248,9 +250,21 @@ export default function StaffOrdersPage() {
                   {order.items.length ? (
                     <ul>
                       {order.items.map((item) => (
-                        <li key={item.orderItemId}>
-                          <span>{item.productName} · {item.color} / {item.size} · Qty {item.quantity}</span>
-                          <strong>{currency(item.subtotal)}</strong>
+                        <li className="staff-order-item-row" key={item.orderItemId}>
+                          <div className="staff-order-item-visual">
+                            {item.imageUrl ? (
+                              <img src={getProductImageUrl(item.imageUrl)}
+                                alt={`${item.productName} in ${item.color}`} loading="lazy" />
+                            ) : (
+                              <span className="staff-order-item-placeholder">No image</span>
+                            )}
+                          </div>
+                          <div className="staff-order-item-info">
+                            <strong>{item.productName}</strong>
+                            <span>Color: {item.color || "Not specified"}</span>
+                            <span>Size: {item.size || "Not specified"} · Qty: {item.quantity}</span>
+                          </div>
+                          <strong className="staff-order-item-price">{currency(item.subtotal)}</strong>
                         </li>
                       ))}
                     </ul>
