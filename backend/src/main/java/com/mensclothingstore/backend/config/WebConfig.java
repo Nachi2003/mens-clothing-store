@@ -29,7 +29,9 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(
-                        "file:///C:/Users/nachi/OneDrive/Desktop/mens-clothing-store/backend/uploads/"
+                        "file:" + System.getProperty("user.dir")
+                                + "/uploads/"
                 );
     }
+
 }

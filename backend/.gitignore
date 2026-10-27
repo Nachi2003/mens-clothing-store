@@ -29,5 +29,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# Local developer configuration
+.env
+src/main/resources/application-local.properties
+
+# Local IDE settings
+.idea/
